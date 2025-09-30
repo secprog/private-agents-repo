@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Platform - Multi-Agent AI System</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%234f46e5'/%3E%3Ccircle cx='35' cy='40' r='8' fill='white'/%3E%3Ccircle cx='65' cy='40' r='8' fill='white'/%3E%3Crect x='30' y='65' width='40' height='8' rx='4' fill='white'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <span>Agent Platform</span>
+                </div>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Sessions</div>
+                    <ul class="nav-list" id="sessionsList">
+                        <!-- Sessions will be loaded here -->
+                    </ul>
+                    <button class="btn-new-chat" id="newChatBtn">
+                        <i class="fas fa-plus"></i> New Chat
+                    </button>
+                    <button class="btn-delete-all" id="deleteAllBtn" title="Delete all sessions">
+                        <i class="fas fa-trash-alt"></i> Clear All
+                    </button>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">Active Agents</div>
+                    <ul class="agent-list" id="agentsList">
+                        <!-- Agents will be loaded here -->
+                    </ul>
+                </div>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <img src="https://placehold.co/32" alt="User" class="user-avatar">
+                    <span class="user-name">User</span>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-left">
+                    <h1 id="chatTitle">New Conversation</h1>
+                    <div class="agent-indicator" id="activeAgent">
+                        <span class="agent-badge">Orchestrator</span>
+                        <span class="status-dot online"></span>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="btn-icon" id="clearChatBtn" title="Clear Chat">
+                        <i class="fas fa-broom"></i>
+                    </button>
+                    <button class="btn-icon" id="exportChatBtn" title="Export Chat">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="btn-icon" id="settingsBtn" title="Settings">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Chat Area -->
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Welcome Message -->
+                    <div class="welcome-message" id="welcomeMessage">
+                        <div class="welcome-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <h2>Welcome to Agent Platform</h2>
+                        <p>Start a conversation with our AI agents. They can help with:</p>
+                        <div class="capability-cards">
+                            <div class="capability-card">
+                                <i class="fas fa-shield-alt"></i>
+                                <h4>Cybersecurity</h4>
+                                <p>Security analysis, threat detection</p>
+                            </div>
+                            <div class="capability-card">
+                                <i class="fas fa-server"></i>
+                                <h4>DevOps</h4>
+                                <p>Deployment, CI/CD, Infrastructure</p>
+                            </div>
+                            <div class="capability-card">
+                                <i class="fas fa-database"></i>
+                                <h4>Data</h4>
+                                <p>Analysis, ETL, Reporting</p>
+                            </div>
+                            <div class="capability-card">
+                                <i class="fas fa-brain"></i>
+                                <h4>Machine Learning</h4>
+                                <p>Model training, Predictions</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Typing Indicator -->
+                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <span class="typing-text">Agent is typing...</span>
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="input-container">
+                <div class="attachments-preview" id="attachmentsPreview" style="display: none;">
+                    <!-- Attachments will be shown here -->
+                </div>
+                <div class="input-wrapper">
+                    <button class="btn-attach" id="attachBtn" title="Attach file">
+                        <i class="fas fa-paperclip"></i>
+                    </button>
+                    <input type="file" id="fileInput" multiple style="display: none;">
+                    <textarea 
+                        id="messageInput" 
+                        class="message-input" 
+                        placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+                        rows="1"
+                    ></textarea>
+                    <button class="btn-send" id="sendBtn" disabled>
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+        
+        <!-- Agent Details Panel -->
+        <aside class="agent-panel" id="agentPanel" style="display: none;">
+            <div class="panel-header">
+                <h3>Agent Details</h3>
+                <button class="btn-icon" id="closePanelBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="panel-content" id="agentDetails">
+                <!-- Agent details will be loaded here -->
+            </div>
+        </aside>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="btn-icon" id="closeSettingsBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>LLM Provider</h3>
+                    <select id="llmProvider" class="form-select">
+                        <option value="azure">Azure OpenAI</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                </div>
+                <div class="settings-section">
+                    <h3>API Endpoint</h3>
+                    <input type="text" id="apiEndpoint" class="form-input" value="http://localhost:8000">
+                </div>
+                <div class="settings-section">
+                    <h3>Theme</h3>
+                    <div class="theme-options">
+                        <button class="theme-btn" data-theme="light">Light</button>
+                        <button class="theme-btn active" data-theme="dark">Dark</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Task Management</h3>
+                    <div class="task-controls">
+                        <button class="btn btn-secondary" id="cancelAllTasksBtn">Cancel All Tasks</button>
+                        <button class="btn btn-secondary" id="refreshTaskStatusBtn">Refresh Task Status</button>
+                        <button class="btn btn-secondary" id="getAgentCardBtn">Get Agent Card</button>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <h3>Notifications</h3>
+                    <div class="notification-controls">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notificationsEnabled" checked>
+                            Enable Push Notifications
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="taskCompletedNotifications" checked>
+                            Task Completed
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="taskFailedNotifications" checked>
+                            Task Failed
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Task Status Modal -->
+    <div class="toast" id="taskToast" style="display: none;">
+        <div class="toast-content">
+            <i class="fas fa-info-circle"></i>
+            <span id="toastMessage">Task processing...</span>
+        </div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirmModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirmTitle">Confirm Action</h3>
+                <button class="modal-close" id="confirmCloseBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Are you sure you want to perform this action?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+                <button class="btn btn-danger" id="confirmOkBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Notification Permission Modal -->
+    <div class="modal" id="notificationPermissionModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🔔 Enable Notifications</h3>
+            </div>
+            <div class="modal-body">
+                <div class="notification-permission-content">
+                    <div class="notification-icon">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <h4>Stay Updated with Agent Tasks</h4>
+                    <p>Get notified when your AI agents complete tasks, encounter errors, or need your attention.</p>
+                    <div class="notification-benefits">
+                        <div class="benefit-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Task completion alerts</span>
+                        </div>
+                        <div class="benefit-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Error notifications</span>
+                        </div>
+                        <div class="benefit-item">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Agent status updates</span>
+                        </div>
+                    </div>
+                    <p class="permission-note">
+                        <i class="fas fa-info-circle"></i>
+                        You can change this setting later in the settings menu.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="notificationSkipBtn">Skip for Now</button>
+                <button class="btn btn-primary" id="notificationEnableBtn">Enable Notifications</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

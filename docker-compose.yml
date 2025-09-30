@@ -1,0 +1,117 @@
+services:
+  # PostgreSQL for session management and data storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: ${POSTGRES_CONTAINER:-agent-platform-postgres}
+    restart: always
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - agent-network
+
+
+  # Main Orchestrator Agent
+  orchestrator:
+    build: ./agents/orchestrator
+    container_name: ${ORCHESTRATOR_CONTAINER:-agent-platform-orchestrator}
+    restart: always
+    ports:
+      - "${ORCHESTRATOR_PORT:-8000}:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - CYBERSECURITY_AGENT_ENDPOINT=${CYBERSECURITY_AGENT_ENDPOINT}
+      - DEVOPS_AGENT_ENDPOINT=${DEVOPS_AGENT_ENDPOINT}
+    depends_on:
+      - postgres
+    networks:
+      - agent-network
+    volumes:
+      - ./agents/orchestrator:/app
+      - /app/__pycache__
+
+  # CyberSecurity Agent (Internal - No External Ports)
+  cybersecurity-agent:
+    build: ./agents/cybersecurity
+    container_name: ${CYBERSECURITY_CONTAINER:-agent-platform-cybersecurity}
+    restart: always
+    ports:
+      - "${CYBERSECURITY_PORT:-8001}:8001"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - ORCHESTRATOR_ENDPOINT=${ORCHESTRATOR_ENDPOINT}
+      - CYBERSECURITY_AGENT_ENDPOINT=${CYBERSECURITY_AGENT_ENDPOINT}
+    depends_on:
+      - orchestrator
+    networks:
+      - agent-network
+    volumes:
+      - ./agents/cybersecurity:/app
+      - /app/__pycache__
+
+  # DevOps Agent (Internal - No External Ports)
+  devops-agent:
+    build: ./agents/devops
+    container_name: ${DEVOPS_CONTAINER:-agent-platform-devops}
+    restart: always
+    ports:
+      - "${DEVOPS_PORT:-8002}:8002"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - ORCHESTRATOR_ENDPOINT=${ORCHESTRATOR_ENDPOINT}
+      - DEVOPS_AGENT_ENDPOINT=${DEVOPS_AGENT_ENDPOINT}
+    depends_on:
+      - orchestrator
+    networks:
+      - agent-network
+    volumes:
+      - ./agents/devops:/app
+      - /app/__pycache__
+      - /var/run/docker.sock:/var/run/docker.sock  # For Docker operations
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    container_name: ${FRONTEND_CONTAINER:-agent-platform-frontend}
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - API_ENDPOINT=${API_ENDPOINT}
+    depends_on:
+      - orchestrator
+    networks:
+      - agent-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # Nginx Reverse Proxy (optional, for production)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: agent-platform-nginx
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+  #     - ./nginx/ssl:/etc/nginx/ssl
+  #   depends_on:
+  #     - frontend
+  #     - orchestrator
+  #   networks:
+  #     - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
