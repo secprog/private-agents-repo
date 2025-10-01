@@ -64,18 +64,12 @@ class DevOpsCore:
         try:
             # A2A client is now handled directly by the SDK
             
-            # Setup message handlers
-            self.setup_message_handlers()
             
             logger.info("DevOps agent initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")
             raise
     
-    def setup_message_handlers(self):
-        """Setup A2A message handlers"""
-        # Message handlers are now handled directly by the ADK SDK
-        pass
     
     def get_capabilities(self) -> List[str]:
         """Get agent capabilities"""
@@ -94,98 +88,9 @@ class DevOpsCore:
             "ansible_playbooks"
         ]
     
-    async def handle_task_assignment(self, message: A2AMessage):
-        """Handle task assignment from orchestrator"""
-        try:
-            task_id = message.content.get("task_id")
-            description = message.content.get("description", "")
-            attachments = message.content.get("attachments", [])
-            
-            logger.info(f"Processing DevOps task {task_id}: {description}")
-            
-            # Analyze the request
-            result = await self.process_devops_task(description, attachments)
-            
-            # Send result back to orchestrator
-            response = A2AMessage(
-                id=f"result_{task_id}",
-                sender_id=self.agent_id,
-                recipient_id=message.sender_id,
-                message_type="task_result",
-                content={
-                    "task_id": task_id,
-                    "result": result,
-                    "status": "completed"
-                }
-            )
-            # Send message - handled by ADK SDK
-            pass
-            
-        except Exception as e:
-            logger.error(f"Error processing task: {e}")
-            # Send error response
-            error_response = A2AMessage(
-                id=f"error_{message.content.get('task_id', 'unknown')}",
-                sender_id=self.agent_id,
-                recipient_id=message.sender_id,
-                message_type="task_error",
-                content={"error": str(e)},
-                metadata={"task_id": message.content.get("task_id")}
-            )
-            # Send error message - handled by ADK SDK
-            pass
     
-    async def handle_health_check(self, message: A2AMessage):
-        """Handle health check from orchestrator"""
-        response = A2AMessage(
-            id=f"health_{datetime.utcnow().isoformat()}",
-            sender_id=self.agent_id,
-            recipient_id=message.sender_id,
-            message_type="health_response",
-            content={
-                "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "metrics": {
-                    "deployments": 0,
-                    "active_pipelines": 0
-                }
-            }
-        )
-        # Send message - handled by ADK SDK
-        pass
     
-    async def handle_capability_query(self, message: A2AMessage):
-        """Handle capability query from orchestrator"""
-        response = A2AMessage(
-            id=f"cap_{datetime.utcnow().isoformat()}",
-            sender_id=self.agent_id,
-            recipient_id=message.sender_id,
-            message_type="capability_response",
-            content={
-                "agent_id": self.agent_id,
-                "capabilities": self.get_capabilities(),
-                "description": "Specialized agent for DevOps operations, deployment automation, and infrastructure management",
-                "version": "1.0.0",
-                "status": "online"
-            }
-        )
-        # Send message - handled by ADK SDK
-        pass
     
-    async def handle_agent_card_query(self, message: A2AMessage):
-        """Handle agent card query from orchestrator"""
-        # Get agent card using ADK SDK's to_a2a() function which auto-generates agent cards
-        agent_card = self.agent.get_agent_card()
-        
-        response = A2AMessage(
-            id=str(uuid.uuid4()),
-            sender_id=self.agent_id,
-            recipient_id=message.sender_id,
-            message_type="agent_card_response",
-            content=agent_card
-        )
-        # Send message - handled by ADK SDK
-        pass
     
     async def process_devops_task(self, request: str, attachments: List[Dict]) -> Dict:
         """Process DevOps task"""

@@ -45,10 +45,7 @@ class OrchestratorCore:
         # Agent registry and discovery
         self.agent_registry = {}
         self.discovery_endpoints = self._get_discovery_endpoints()
-        
-        # WebSocket connections
-        self.websocket_connections = {}
-    
+            
     def _get_discovery_endpoints(self) -> List[str]:
         """Get potential agent endpoints for discovery from environment"""
         endpoints = []
@@ -71,16 +68,11 @@ class OrchestratorCore:
             # The session service handles its own initialization
             logger.info("Google ADK session service initialized")
             
-            # A2A client is now handled directly by the SDK
-            
-            # Setup message handlers
-            self.setup_message_handlers()
             
             # Discover available agents first
             await self.discover_agents()
             
             # Start background tasks
-            asyncio.create_task(self.health_check_loop())
             asyncio.create_task(self.periodic_agent_discovery())
             
             logger.info("Orchestrator initialized successfully")
@@ -88,10 +80,6 @@ class OrchestratorCore:
             logger.error(f"Failed to initialize orchestrator: {e}")
             raise
     
-    def setup_message_handlers(self):
-        """Setup A2A message handlers"""
-        # Message handlers are now handled directly by the ADK SDK
-        pass
     
     async def discover_agents(self):
         """Discover available agents and their agent cards using ADK's .well-known/agent-card.json endpoint"""
@@ -309,232 +297,7 @@ class OrchestratorCore:
             logger.error(f"Failed to analyze artifact type: {e}")
             return {"error": "Analysis failed", "reason": "LLM analysis failed"}
     
-    async def _route_artifact_to_agent(self, artifact_data: ArtifactData, analysis: Dict, agent_id: str, session_id: str) -> Dict:
-        """Route artifact to specific agent"""
-        try:
-            # Create task for agent
-            task_id = str(uuid.uuid4())
-            task = {
-                "id": task_id,
-                "type": "artifact_analysis",
-                "artifact": artifact_data.filename,
-                "analysis": analysis,
-                "assigned_agent": agent_id,
-                "status": TaskStatus.PENDING.value,
-                "created_at": datetime.utcnow().isoformat()
-            }
-            
-            # Store task as session event
-            try:
-                # Get or create session for this task
-                session = await self.session_service.get_session(
-                    app_name="agent_platform",
-                    user_id="system",
-                    session_id=session_id
-                )
-                if not session:
-                    session = await self.session_service.create_session(
-                        app_name="agent_platform",
-                        user_id="system",
-                        session_id=session_id,
-                        initial_state={"tasks": []}
-                    )
-                
-                # Append task creation event to session
-                await self.session_service.append_event(session, {
-                    "type": "task_created",
-                    "task": task,
-                    "timestamp": datetime.utcnow().isoformat()
-                })
-                logger.info(f"Task {task_id} stored as session event")
-            except Exception as e:
-                logger.error(f"Failed to store task as session event: {e}")
-            
-            # Send artifact analysis task to agent
-            task_message = A2AMessage(
-                id=task_id,
-                sender_id=self.agent_id,
-                recipient_id=agent_id,
-                message_type="artifact_analysis_task",
-                content={
-                    "task_id": task_id,
-                    "artifact": artifact_data.filename,
-                    "artifact_data": artifact_data.dict(),
-                    "analysis": analysis
-                },
-                metadata={"orchestrator_task_id": task_id}
-            )
-            
-            # Get agent endpoint
-            agent_info = self.agent_registry.get(agent_id)
-            if not agent_info:
-                return {"status": "error", "message": f"Agent {agent_id} not found"}
-            
-            # Send task to agent - handled by ADK SDK
-            pass
-            
-            return {
-                "status": "routed",
-                "task_id": task_id,
-                "assigned_agent": agent_id,
-                "artifact": artifact_data.filename
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to route artifact to agent: {e}")
-            return {"status": "error", "message": str(e)}
     
-    async def analyze_and_route(self, request: str, attachments: List[Dict] = None) -> Dict:
-        """Analyze request and route to appropriate agent"""
-        try:
-            # Store chat message
-            chat_message = {
-                "id": str(uuid.uuid4()),
-                "session_id": str(uuid.uuid4()),
-                "user_id": os.getenv('USER_ID', 'anonymous'),
-                "content": request,
-                "attachments": attachments or [],
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            
-            # Store chat message as session event
-            try:
-                # Get or create session for this chat
-                session = await self.session_service.get_session(
-                    app_name="agent_platform",
-                    user_id=chat_message["user_id"],
-                    session_id=chat_message["session_id"]
-                )
-                if not session:
-                    session = await self.session_service.create_session(
-                        app_name="agent_platform",
-                        user_id=chat_message["user_id"],
-                        session_id=chat_message["session_id"],
-                        initial_state={"messages": []}
-                    )
-                
-                # Append chat message event to session
-                await self.session_service.append_event(session, {
-                    "type": "chat_message",
-                    "message": chat_message,
-                    "timestamp": datetime.utcnow().isoformat()
-                })
-                logger.info(f"Chat message stored as session event")
-            except Exception as e:
-                logger.error(f"Failed to store chat message as session event: {e}")
-            
-            # Build agent information for LLM analysis
-            agent_info = []
-            for agent_id, agent_data in self.agent_registry.items():
-                agent_card = agent_data.get("agent_card", {})
-                agent_info.append({
-                    "agent_id": agent_id,
-                    "capabilities": agent_data.get("capabilities", []),
-                    "tools": [tool.get("name", "") for tool in agent_data.get("tools", [])],
-                    "description": agent_data.get("description", "")
-                })
-            
-            # Analyze request with LLM using rich agent metadata
-            analysis_prompt = f"""
-            Analyze this request and determine:
-            1. Required capabilities
-            2. Priority: high/medium/low
-            3. Estimated complexity: simple/moderate/complex
-            
-            Request: {request}
-            Attachments: {attachments or 'None'}
-            
-            Available agents with their capabilities and tools:
-            {json.dumps(agent_info, indent=2)}
-            
-            Respond in JSON format with keys: required_capabilities, priority, complexity
-            """
-            
-            response = await self.agent.run(
-                messages=[{"role": "user", "content": analysis_prompt}],
-                temperature=0.3
-            )
-            
-            analysis = json.loads(response.choices[0].message.content)
-            
-            # Find agent with matching capabilities
-            selected_agent = await self.find_agent_by_capabilities(analysis.get("required_capabilities", []))
-            
-            if not selected_agent:
-                logger.warning("No suitable agent found for task")
-                return {
-                    "status": "no_agent_available",
-                    "analysis": analysis,
-                    "fallback": True
-                }
-            
-            # Create task
-            task_id = str(uuid.uuid4())
-            task = {
-                "id": task_id,
-                "description": request,
-                "type": "task",
-                "assigned_agent": selected_agent["agent_id"],
-                "status": TaskStatus.PENDING,
-                "priority": analysis.get("priority", "medium"),
-                "complexity": analysis.get("complexity", "moderate"),
-                "created_at": datetime.utcnow().isoformat(),
-                "attachments": attachments or []
-            }
-            
-            # Store task as session event
-            try:
-                # Get or create session for this task
-                session = await self.session_service.get_session(
-                    app_name="agent_platform",
-                    user_id="system",
-                    session_id=task_id
-                )
-                if not session:
-                    session = await self.session_service.create_session(
-                        app_name="agent_platform",
-                        user_id="system",
-                        session_id=task_id,
-                        initial_state={"tasks": []}
-                    )
-                
-                # Append task creation event to session
-                await self.session_service.append_event(session, {
-                    "type": "task_created",
-                    "task": task,
-                    "timestamp": datetime.utcnow().isoformat()
-                })
-                logger.info(f"Task {task_id} stored as session event")
-            except Exception as e:
-                logger.error(f"Failed to store task as session event: {e}")
-            
-            # Send task to selected agent
-            task_message = A2AMessage(
-                id=str(uuid.uuid4()),
-                sender_id=self.agent_id,
-                recipient_id=selected_agent["agent_id"],
-                message_type="task_assignment",
-                content={
-                    "task_id": task_id,
-                    "description": request,
-                    "attachments": attachments or [],
-                    "priority": analysis.get("priority", "medium")
-                }
-            )
-            
-            # Send task to selected agent - handled by ADK SDK
-            pass
-            
-            return {
-                "status": "routed",
-                "task_id": task_id,
-                "assigned_agent": selected_agent["agent_id"],
-                "analysis": analysis
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to analyze and route request: {e}")
-            raise
     
     async def handle_task_result(self, message: A2AMessage):
         """Handle task result from agent"""
@@ -591,23 +354,3 @@ class OrchestratorCore:
             logger.error(f"Error handling capability response: {e}")
     
     
-    async def health_check_loop(self):
-        """Periodic health check of registered agents"""
-        while True:
-            try:
-                for agent_id, agent_info in self.agent_registry.items():
-                    if agent_info["status"] == "online":
-                        # Send health check ping
-                        ping_message = A2AMessage(
-                            id=str(uuid.uuid4()),
-                            sender_id=self.agent_id,
-                            recipient_id=agent_id,
-                            message_type="health_check",
-                            content={"timestamp": datetime.utcnow().isoformat()}
-                        )
-                        # Send ping to agent - handled by ADK SDK
-                        pass
-            except Exception as e:
-                logger.error(f"Health check error: {e}")
-            
-            await asyncio.sleep(30)  # Check every 30 seconds

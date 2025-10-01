@@ -65,11 +65,6 @@ class CyberSecurityCore:
     async def initialize(self):
         """Initialize cybersecurity agent"""
         try:
-            # A2A client is now handled directly by the SDK
-            
-            # Setup message handlers
-            self.setup_message_handlers()
-            
             # Register with orchestrator
             await self.register_with_orchestrator()
             
@@ -113,10 +108,6 @@ class CyberSecurityCore:
         except Exception as e:
             logger.error(f"Failed to register with orchestrator: {e}")
     
-    def setup_message_handlers(self):
-        """Setup A2A message handlers"""
-        # Message handlers are now handled directly by the ADK SDK
-        pass
     
     def get_capabilities(self) -> List[str]:
         """Get agent capabilities"""
@@ -130,101 +121,6 @@ class CyberSecurityCore:
             "pattern_detection",
             "security_recommendations"
         ]
-    
-    async def handle_task_assignment(self, message: A2AMessage):
-        """Handle task assignment from orchestrator"""
-        try:
-            task_id = message.content.get("task_id")
-            description = message.content.get("description", "")
-            attachments = message.content.get("attachments", [])
-            
-            logger.info(f"Processing security task {task_id}: {description}")
-            
-            # Analyze the request
-            result = await self.analyze_security_task(description, attachments)
-            
-            # Send result back to orchestrator
-            response = A2AMessage(
-                id=f"result_{task_id}",
-                sender_id=self.agent_id,
-                recipient_id=message.sender_id,
-                message_type="task_result",
-                content={
-                    "task_id": task_id,
-                    "result": result,
-                    "status": "completed"
-                }
-            )
-            # Send message - handled by ADK SDK
-            pass
-            
-        except Exception as e:
-            logger.error(f"Error processing task: {e}")
-            # Send error response
-            error_response = A2AMessage(
-                id=f"error_{message.content.get('task_id', 'unknown')}",
-                sender_id=self.agent_id,
-                recipient_id=message.sender_id,
-                message_type="task_error",
-                content={"error": str(e)},
-                metadata={"task_id": message.content.get("task_id")}
-            )
-            # Send error message - handled by ADK SDK
-            pass
-    
-    async def handle_artifact_analysis_task(self, message: A2AMessage):
-        """Handle artifact analysis task from orchestrator"""
-        try:
-            task_id = message.content.get("task_id")
-            artifact_filename = message.content.get("artifact")
-            artifact_data = message.content.get("artifact_data")
-            analysis = message.content.get("analysis", {})
-            
-            logger.info(f"Processing artifact analysis task {task_id} for {artifact_filename}")
-            
-            # Create ArtifactData object
-            artifact = ArtifactData(**artifact_data)
-            
-            # Analyze the artifact based on its type
-            if artifact.mime_type in ["application/json", "application/xml", "text/plain"]:
-                # Likely SBOM or security report
-                result = await self.analyze_sbom_artifact(artifact, analysis)
-            elif artifact.mime_type.startswith("text/"):
-                # Text-based security file
-                result = await self.analyze_text_security_file(artifact, analysis)
-            else:
-                # Generic file analysis
-                result = await self.analyze_generic_artifact(artifact, analysis)
-            
-            # Send result back to orchestrator
-            response = A2AMessage(
-                id=f"artifact_result_{task_id}",
-                sender_id=self.agent_id,
-                recipient_id=message.sender_id,
-                message_type="artifact_analysis_result",
-                content={
-                    "task_id": task_id,
-                    "artifact": artifact_filename,
-                    "result": result,
-                    "status": "completed"
-                }
-            )
-            # Send message - handled by ADK SDK
-            pass
-            
-        except Exception as e:
-            logger.error(f"Error processing artifact analysis: {e}")
-            # Send error response
-            error_response = A2AMessage(
-                id=f"artifact_error_{message.content.get('task_id')}",
-                sender_id=self.agent_id,
-                recipient_id=message.sender_id,
-                message_type="artifact_analysis_error",
-                content={"error": str(e)},
-                metadata={"task_id": message.content.get("task_id")}
-            )
-            # Send error message - handled by ADK SDK
-            pass
     
     async def analyze_sbom_artifact(self, artifact: ArtifactData, analysis: Dict) -> Dict:
         """Analyze SBOM (Software Bill of Materials) for vulnerabilities"""
@@ -349,57 +245,6 @@ class CyberSecurityCore:
             logger.error(f"Error analyzing generic artifact: {e}")
             return {"error": f"Generic analysis failed: {str(e)}"}
     
-    async def handle_health_check(self, message: A2AMessage):
-        """Handle health check from orchestrator"""
-        response = A2AMessage(
-            id=f"health_{datetime.utcnow().isoformat()}",
-            sender_id=self.agent_id,
-            recipient_id=message.sender_id,
-            message_type="health_response",
-            content={
-                "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "metrics": {
-                    "tasks_processed": 0,  # Would track this
-                    "avg_response_time": 0.0
-                }
-            }
-        )
-        # Send message - handled by ADK SDK
-        pass
-    
-    async def handle_capability_query(self, message: A2AMessage):
-        """Handle capability query from orchestrator"""
-        response = A2AMessage(
-            id=f"cap_{datetime.utcnow().isoformat()}",
-            sender_id=self.agent_id,
-            recipient_id=message.sender_id,
-            message_type="capability_response",
-            content={
-                "agent_id": self.agent_id,
-                "capabilities": self.get_capabilities(),
-                "description": "Specialized agent for cybersecurity analysis, threat detection, and vulnerability assessment",
-                "version": "1.0.0",
-                "status": "online"
-            }
-        )
-        # Send message - handled by ADK SDK
-        pass
-    
-    async def handle_agent_card_query(self, message: A2AMessage):
-        """Handle agent card query from orchestrator"""
-        # Get agent card using ADK SDK's to_a2a() function which auto-generates agent cards
-        agent_card = self.agent.get_agent_card()
-        
-        response = A2AMessage(
-            id=str(uuid.uuid4()),
-            sender_id=self.agent_id,
-            recipient_id=message.sender_id,
-            message_type="agent_card_response",
-            content=agent_card
-        )
-        # Send message - handled by ADK SDK
-        pass
     
     async def analyze_security_task(self, request: str, attachments: List[Dict]) -> Dict:
         """Analyze security task"""
