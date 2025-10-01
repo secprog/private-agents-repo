@@ -3,17 +3,7 @@ Shared data models for the agent platform
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime
-from enum import Enum
 from pydantic import BaseModel
-
-
-class TaskStatus(str, Enum):
-    """Task status enumeration"""
-    PENDING = "pending"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILED = "failed"
 
 
 # ChatMessage removed - using A2A protocol only
@@ -56,16 +46,3 @@ class ThreatReport(BaseModel):
     confidence: float
 
 
-class DeploymentRequest(BaseModel):
-    """Deployment request model"""
-    project_name: str
-    environment: str = "development"  # development, staging, production
-    deployment_type: str = "docker"  # docker, kubernetes, serverless
-    configuration: Optional[Dict] = None
-
-
-class InfrastructureRequest(BaseModel):
-    """Infrastructure request model"""
-    action: str  # create, update, destroy
-    resource_type: str  # vm, container, database, network
-    specifications: Dict

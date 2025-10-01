@@ -81,7 +81,6 @@ class OrchestratorCore:
             
             # Start background tasks
             asyncio.create_task(self.health_check_loop())
-            asyncio.create_task(self.process_message_queue())
             asyncio.create_task(self.periodic_agent_discovery())
             
             logger.info("Orchestrator initialized successfully")
@@ -162,44 +161,6 @@ class OrchestratorCore:
             return endpoint.replace('https://', '').replace('http://', '').replace(':', '-').replace('/', '-')
     
     
-    async def handle_agent_registration(self, message: A2AMessage):
-        """Handle agent self-registration"""
-        try:
-            agent_data = message.content
-            agent_id = agent_data.get("agent_id")
-            endpoint = agent_data.get("endpoint")
-            capabilities = agent_data.get("capabilities", [])
-            description = agent_data.get("description", "")
-            
-            # Register the agent
-            self.agent_registry[agent_id] = {
-                "agent_id": agent_id,
-                "endpoint": endpoint,
-                "capabilities": capabilities,
-                "description": description,
-                "status": "online",
-                "registered_at": datetime.utcnow().isoformat()
-            }
-            
-            logger.info(f"✅ Agent {agent_id} registered successfully at {endpoint}")
-            
-            # Send confirmation back to agent
-            response = A2AMessage(
-                id=str(uuid.uuid4()),
-                sender_id=self.agent_id,
-                recipient_id=agent_id,
-                message_type="registration_confirmation",
-                content={
-                    "status": "registered",
-                    "agent_id": agent_id,
-                    "message": "Successfully registered with orchestrator"
-                }
-            )
-            # Send message to agent - handled by ADK SDK
-            pass
-            
-        except Exception as e:
-            logger.error(f"Error handling agent registration: {e}")
     
     async def handle_agent_card_response(self, message: A2AMessage):
         """Handle agent card response from agents"""
@@ -629,15 +590,6 @@ class OrchestratorCore:
         except Exception as e:
             logger.error(f"Error handling capability response: {e}")
     
-    async def process_message_queue(self):
-        """Process incoming A2A messages"""
-        while True:
-            try:
-                # Process messages - handled by ADK SDK
-                pass
-            except Exception as e:
-                logger.error(f"Error processing message queue: {e}")
-            await asyncio.sleep(0.1)
     
     async def health_check_loop(self):
         """Periodic health check of registered agents"""
