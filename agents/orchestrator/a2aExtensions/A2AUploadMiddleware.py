@@ -65,7 +65,7 @@ class A2AUploadMiddleware(BaseHTTPMiddleware):
         logger.info(f"A2A Upload Middleware: {request.method} {request.url.path}")
         logger.info(f"Headers: {dict(request.headers)}")
         
-        if request.method == "POST":  # Remove path restriction to see all POST requests
+        if request.method == "POST" and request.url.path == "/":
             # Repare no header de negociação de extensões
             ext_hdr = request.headers.get("X-A2A-Extensions", "")
             logger.info(f"X-A2A-Extensions header: {ext_hdr}")
