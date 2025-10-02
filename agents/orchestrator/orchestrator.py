@@ -55,9 +55,6 @@ app.add_middleware(
     allow_headers=["*", "X-A2A-Extensions"],  # Explicitly allow A2A extension header
 )
 
-
-
-
 # Add custom endpoints to the A2A app
 @app.route("/health", methods=["GET"])
 async def health_check(request):

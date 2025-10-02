@@ -12,6 +12,7 @@ from google.adk.artifacts import InMemoryArtifactService, GcsArtifactService
 from google.genai.types import Part, Blob
 
 from modules.models import ArtifactData
+from modules.filesystem_artifact_service import FilesystemArtifactService
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,11 @@ class ArtifactServiceWrapper:
                     raise ValueError("GCS bucket name required for GcsArtifactService")
                 service = GcsArtifactService(bucket_name=bucket_name)
                 logger.info(f"Created GcsArtifactService: {type(service)}")
+                return service
+            elif service_type == "filesystem":
+                base_path = kwargs.get('base_path', os.getenv('FILESYSTEM_ARTIFACT_PATH', './artifacts'))
+                service = FilesystemArtifactService(base_path=base_path)
+                logger.info(f"Created FilesystemArtifactService: {type(service)} at {base_path}")
                 return service
             else:
                 raise ValueError(f"Unsupported artifact service type: {service_type}")
@@ -204,5 +210,7 @@ def create_artifact_service() -> ArtifactServiceWrapper:
     kwargs = {}
     if service_type == 'gcs':
         kwargs['bucket_name'] = os.getenv('GCS_ARTIFACT_BUCKET')
+    elif service_type == 'filesystem':
+        kwargs['base_path'] = os.getenv('FILESYSTEM_ARTIFACT_PATH', './artifacts')
     
     return ArtifactServiceWrapper(service_type=service_type, **kwargs)
