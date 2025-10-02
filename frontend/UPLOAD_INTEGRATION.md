@@ -15,7 +15,7 @@ The frontend now uses the A2A upload extension to handle file uploads instead of
 
 ### 2. Upload Process
 - Files are uploaded using the A2A upload extension
-- Upload happens in 512KB chunks for better reliability
+- Upload happens in 1MB chunks for better reliability
 - Progress is shown in real-time
 - Files are stored in the artifact service with proper namespacing
 
