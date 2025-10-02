@@ -11,9 +11,6 @@ import httpx
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
-# Google ADK SDK imports - temporarily disabled due to import issues
-# from google.adk.agents.context import InvocationContext
-# from google.adk.agents.events import Event, EventActions
 
 from modules.models import TaskStatus, A2AMessage, ArtifactData
 from modules.session_service import AgentSessionService

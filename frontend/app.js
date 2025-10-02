@@ -1,7 +1,152 @@
 /**
  * Agent Platform Frontend Application
- * Handles UI interactions, WebSocket communication, and A2A protocol
+ * Handles UI interactions, JSON-RPC communication, and A2A protocol
  */
+
+class A2AUploadService {
+    constructor(apiEndpoint) {
+        this.apiEndpoint = apiEndpoint;
+        this.extensionUri = "urn:orquestrator:artifact-upload:v1";
+        this.maxChunkSize = 1000000; // 1MB chunks
+    }
+
+    async uploadFile(file, sessionId, userId, onProgress = null) {
+        try {
+            // Start upload
+            const startResponse = await this.startUpload(file, sessionId, userId);
+            const uploadId = startResponse.result.uploadId;
+            
+            // Upload file in chunks
+            const fileData = await this.fileToArrayBuffer(file);
+            const totalChunks = Math.ceil(fileData.byteLength / this.maxChunkSize);
+            
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * this.maxChunkSize;
+                const end = Math.min(start + this.maxChunkSize, fileData.byteLength);
+                const chunk = fileData.slice(start, end);
+                const chunkBase64 = this.arrayBufferToBase64(chunk);
+                
+                await this.appendChunk(uploadId, chunkBase64, start);
+                
+                // Report progress
+                if (onProgress) {
+                    onProgress((i + 1) / totalChunks * 100);
+                }
+            }
+            
+            // Finish upload
+            const finishResponse = await this.finishUpload(uploadId, 'session');
+            return finishResponse.result;
+            
+        } catch (error) {
+            console.error('Upload failed:', error);
+            throw error;
+        }
+    }
+
+    async startUpload(file, sessionId, userId) {
+        const request = {
+            jsonrpc: "2.0",
+            method: "artifactUpload/start",
+            params: {
+                filename: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                userId: userId,
+                sessionId: sessionId
+            },
+            id: this.generateId()
+        };
+
+        return await this.sendRequest(request);
+    }
+
+    async appendChunk(uploadId, chunkBase64, offset) {
+        const request = {
+            jsonrpc: "2.0",
+            method: "artifactUpload/append",
+            params: {
+                uploadId: uploadId,
+                chunkBase64: chunkBase64,
+                offset: offset
+            },
+            id: this.generateId()
+        };
+
+        return await this.sendRequest(request);
+    }
+
+    async finishUpload(uploadId, scope = 'session') {
+        const request = {
+            jsonrpc: "2.0",
+            method: "artifactUpload/finish",
+            params: {
+                uploadId: uploadId,
+                scope: scope
+            },
+            id: this.generateId()
+        };
+
+        return await this.sendRequest(request);
+    }
+
+    async abortUpload(uploadId) {
+        const request = {
+            jsonrpc: "2.0",
+            method: "artifactUpload/abort",
+            params: {
+                uploadId: uploadId
+            },
+            id: this.generateId()
+        };
+
+        return await this.sendRequest(request);
+    }
+
+    async sendRequest(request) {
+        const response = await fetch(this.apiEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-A2A-Extensions': this.extensionUri
+            },
+            body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error.message || 'Upload error');
+        }
+
+        return data;
+    }
+
+    fileToArrayBuffer(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return btoa(binary);
+    }
+
+    generateId() {
+        return 'upload_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+}
 
 class AgentPlatform {
     constructor() {
@@ -28,6 +173,9 @@ class AgentPlatform {
         this.agents = [];
         this.attachments = [];
         this.isTyping = false;
+        
+        // Initialize A2A upload service
+        this.uploadService = new A2AUploadService(this.apiEndpoint);
         
         this.init();
     }
@@ -654,20 +802,26 @@ Agent Card Information:
                 text: content
             }];
             
-            // Add attached files as file parts
+            // Add attached files as DataPart with artifact references (A2A compliant)
             for (const attachment of this.attachments) {
-                if (attachment.data) {
-                    // Use file type or default fallback
-                    const mimeType = attachment.type || 'application/octet-stream';
-                    
+                if (attachment.uploaded && attachment.filename) {
+                    // Use proper A2A DataPart with artifact reference
                     parts.push({
-                        kind: 'file',
-                        file: {
-                            name: attachment.name,
-                            mimeType: mimeType,
-                            bytes: attachment.data
+                        kind: 'data',
+                        data: {
+                            artifactRef: {
+                                app: "agent-platform",
+                                user: this.userId,
+                                session: this.sessionId,
+                                filename: attachment.filename,
+                                mime: attachment.type || 'application/octet-stream'
+                            }
                         }
                     });
+                } else if (!attachment.uploaded) {
+                    // Skip files that haven't finished uploading
+                    this.showToast(`File "${attachment.name}" is still uploading. Please wait.`, 'warning');
+                    return;
                 }
             }
             
@@ -710,18 +864,6 @@ Agent Card Information:
     
 
 
-    fileToBase64(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => {
-                // Remove data URL prefix (e.g., "data:image/png;base64,")
-                const base64 = reader.result.split(',')[1];
-                resolve(base64);
-            };
-            reader.onerror = error => reject(error);
-        });
-    }
 
 
     
@@ -1069,29 +1211,48 @@ Agent Card Information:
         if (!files.length) return;
         
         for (let file of files) {
-            // Check file size (limit to 5MB to avoid payload too large errors)
-            if (file.size > 5 * 1024 * 1024) {
-                this.showToast(`File ${file.name} is too large (max 5MB)`, 'error');
+            // Check file size (limit to 50MB for A2A upload)
+            if (file.size > 50 * 1024 * 1024) {
+                this.showToast(`File ${file.name} is too large (max 50MB)`, 'error');
                 continue;
             }
             
-            // Convert file to base64 and store for later sending
-            try {
-                const base64Data = await this.fileToBase64(file);
+            // Ensure we have a session before uploading
+            if (!this.sessionId) {
+                this.createNewChat();
+            }
             
-                // Add to attachments preview (not uploaded yet)
-            this.attachments.push({
-                name: file.name,
-                size: file.size,
+            try {
+                // Show upload progress
+                this.showToast(`📤 Uploading "${file.name}"...`, 'info');
+                
+                // Upload file using A2A upload service
+                const uploadResult = await this.uploadService.uploadFile(
+                    file, 
+                    this.sessionId, 
+                    this.userId,
+                    (progress) => {
+                        // Update progress in UI
+                        this.updateUploadProgress(file.name, progress);
+                    }
+                );
+                
+                // Add to attachments with upload result
+                this.attachments.push({
+                    name: file.name,
+                    size: file.size,
                     type: file.type || 'application/octet-stream',
-                    data: base64Data,
-                    uploaded: false
+                    filename: uploadResult.filename,
+                    namespace: uploadResult.namespace,
+                    uploaded: true,
+                    uploadResult: uploadResult
                 });
                 
-                this.showToast(`📎 File "${file.name}" attached - type your message and send`, 'info');
+                this.showToast(`✅ File "${file.name}" uploaded successfully`, 'success');
+                
             } catch (error) {
-                console.error('Error processing file:', error);
-                this.showToast(`Failed to process file ${file.name}`, 'error');
+                console.error('Error uploading file:', error);
+                this.showToast(`Failed to upload file ${file.name}: ${error.message}`, 'error');
             }
         }
         
@@ -1101,6 +1262,15 @@ Agent Card Information:
         event.target.value = '';
     }
     
+    updateUploadProgress(filename, progress) {
+        // Find the attachment and update its progress
+        const attachment = this.attachments.find(att => att.name === filename);
+        if (attachment) {
+            attachment.uploadProgress = progress;
+            this.updateAttachmentsPreview();
+        }
+    }
+
     updateAttachmentsPreview() {
         const preview = document.getElementById('attachmentsPreview');
         
@@ -1115,11 +1285,22 @@ Agent Card Information:
         this.attachments.forEach((attachment, index) => {
             const item = document.createElement('div');
             item.className = 'attachment-preview';
-            const status = attachment.uploaded ? 'uploaded' : 'attached';
+            
+            let status = 'attached';
+            let statusClass = 'attachment-status';
+            
+            if (attachment.uploaded) {
+                status = 'uploaded';
+                statusClass += ' uploaded';
+            } else if (attachment.uploadProgress !== undefined) {
+                status = `uploading ${Math.round(attachment.uploadProgress)}%`;
+                statusClass += ' uploading';
+            }
+            
             item.innerHTML = `
                 <i class="fas fa-file"></i>
                 <span>${attachment.name}</span>
-                <span class="attachment-status">(${status})</span>
+                <span class="${statusClass}">(${status})</span>
                 <button onclick="app.removeAttachment(${index})">
                     <i class="fas fa-times"></i>
                 </button>
@@ -1129,6 +1310,12 @@ Agent Card Information:
     }
     
     removeAttachment(index) {
+        const attachment = this.attachments[index];
+        if (attachment && attachment.uploaded) {
+            // Note: In a production app, you might want to call an abort endpoint
+            // to clean up the uploaded file on the server
+            console.log(`Removed uploaded file: ${attachment.filename}`);
+        }
         this.attachments.splice(index, 1);
         this.updateAttachmentsPreview();
     }
@@ -1346,62 +1533,10 @@ Agent Card Information:
             this.showToast('Failed to export chat', 'error');
         }
     }
-    
-    cleanupContaminatedData(sessionData) {
-        console.log('🧹 Cleaning up contaminated data...');
-        
-        // Collect all taskIds and their sessions
-        const taskIdToSessions = {};
-        const sessions = Object.values(sessionData);
-        
-        // First pass: map each taskId to all sessions that have it
-        sessions.forEach(session => {
-            if (session.taskIds && Array.isArray(session.taskIds)) {
-                session.taskIds.forEach(taskId => {
-                    if (!taskIdToSessions[taskId]) {
-                        taskIdToSessions[taskId] = [];
-                    }
-                    taskIdToSessions[taskId].push(session.id);
-                });
-            }
-        });
-        
-        // Find contaminated taskIds (appearing in multiple sessions)
-        const contaminatedTaskIds = Object.entries(taskIdToSessions)
-            .filter(([taskId, sessionIds]) => sessionIds.length > 1)
-            .map(([taskId, sessionIds]) => ({ taskId, sessionIds }));
-        
-        if (contaminatedTaskIds.length > 0) {
-            console.log('🚨 Found contaminated taskIds:', contaminatedTaskIds);
-            
-            // Remove contaminated taskIds from all sessions
-            contaminatedTaskIds.forEach(({ taskId, sessionIds }) => {
-                console.log(`🗑️ Removing contaminated taskId ${taskId} from sessions:`, sessionIds);
-                sessionIds.forEach(sessionId => {
-                    if (sessionData[sessionId] && sessionData[sessionId].taskIds) {
-                        const index = sessionData[sessionId].taskIds.indexOf(taskId);
-                        if (index > -1) {
-                            sessionData[sessionId].taskIds.splice(index, 1);
-                            console.log(`   ✅ Removed from session ${sessionId}`);
-                        }
-                    }
-                });
-            });
-            
-            // Save cleaned data back to localStorage
-            localStorage.setItem('sessionData', JSON.stringify(sessionData));
-            console.log('✅ Contaminated data cleaned up and saved to localStorage');
-        } else {
-            console.log('✅ No contaminated data found');
-        }
-    }
 
     async loadSessions() {
         // Load session data from localStorage
         const sessionData = JSON.parse(localStorage.getItem('sessionData') || '{}');
-        
-        // Clean up contaminated data - remove duplicate taskIds across sessions
-        // this.cleanupContaminatedData(sessionData);
         
         // Create session objects with task_ids
         this.sessions = Object.values(sessionData).map(conv => {
@@ -1951,6 +2086,9 @@ Agent Card Information:
         localStorage.setItem('taskFailedNotifications', taskFailedNotifications);
         
         this.apiEndpoint = endpoint;
+        
+        // Update upload service endpoint
+        this.uploadService.apiEndpoint = endpoint;
         
         // Reload agents with new endpoint
         this.loadAgents();

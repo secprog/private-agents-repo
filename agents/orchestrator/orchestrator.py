@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from modules.orchestrator_core import OrchestratorCore
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from a2a.types import AgentCard
+from a2aExtensions.A2AUploadMiddleware import A2AUploadMiddleware
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -30,7 +31,7 @@ agent_card = AgentCard(
                 "uri": "urn:orquestrator:artifact-upload:v1",
                 "description": "File Upload chunked (start/append/finish).",
                 "required": False,
-                "params": {"maxChunkBytes": 524288},
+                "params": {"maxChunkBytes": 1000000}, #1MB
             }
         ]
     },
@@ -41,14 +42,20 @@ agent_card = AgentCard(
 )
 app = to_a2a(root_agent, port=8000, agent_card=agent_card)
 
+
+# Add A2A Upload middleware
+app.add_middleware(A2AUploadMiddleware)
+
 # Add CORS middleware to A2A app
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-A2A-Extensions"],  # Explicitly allow A2A extension header
 )
+
+
 
 
 # Add custom endpoints to the A2A app
@@ -58,9 +65,6 @@ async def health_check(request):
     from starlette.responses import JSONResponse
 
     return JSONResponse({"status": "healthy", "agent_id": orchestrator_core.agent_id})
-
-
-
 
 # Add startup and shutdown handlers to A2A app
 @app.on_event("startup")

@@ -693,6 +693,20 @@ body {
     color: var(--error-color);
 }
 
+.attachment-status {
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.attachment-status.uploaded {
+    color: var(--success-color);
+}
+
+.attachment-status.uploading {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
 .input-wrapper {
     display: flex;
     align-items: flex-end;
