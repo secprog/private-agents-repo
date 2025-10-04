@@ -25,7 +25,7 @@ class DevOpsCore:
     """ADK-based DevOps agent core functionality"""
     
     def __init__(self):
-        self.agent_id = "devops-agent-01"
+        self.agent_id = "devops-agent"
         self.endpoint = os.getenv('DEVOPS_AGENT_ENDPOINT', 'https://devops-agent:8002')
         
         # Initialize ADK LLM agent directly

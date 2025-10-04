@@ -311,6 +311,10 @@ body {
     background: var(--error-color);
 }
 
+.status-dot.loading {
+    background: #ff8c00; /* Orange color for loading state */
+}
+
 /* Sidebar Footer */
 .sidebar-footer {
     padding: 1rem;
@@ -1070,6 +1074,170 @@ body {
     background: #dc2626;
     color: white;
     border: 1px solid #dc2626;
+}
+
+/* Agent Card Content in Settings */
+.agent-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.agent-info-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.agent-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--border-radius);
+    border-left: 3px solid var(--primary-color);
+}
+
+.agent-info-item .info-icon {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+    margin-top: 0.125rem;
+    min-width: 1.25rem;
+}
+
+.agent-info-item .info-content {
+    flex: 1;
+}
+
+.agent-info-item .info-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.agent-info-item .info-value {
+    color: var(--text-secondary);
+    line-height: 1.4;
+}
+
+.capabilities-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.capability-tag {
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Disabled input controls styling */
+.message-input:disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-send:disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-new-chat:disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-attach:disabled {
+    background-color: var(--bg-tertiary);
+    color: var(--text-disabled);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Add disabled text color if not defined */
+:root {
+    --text-disabled: #888;
+}
+
+/* Connection Settings Styling */
+.connection-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.form-group .form-input {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.form-group .form-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+.form-group small {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    font-style: italic;
+}
+
+/* User Avatar Icon */
+.user-avatar-icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--text-primary);
+    color: var(--text-secondary);
+    border-radius: 50%;
+    font-size: 16px;
+    line-height: 1;
+    text-align: center;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.user-avatar-icon::before {
+    display: block;
+    width: 100%;
+    text-align: center;
+    line-height: 32px;
 }
 
 #confirmModal .btn-danger:hover {

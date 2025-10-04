@@ -314,18 +314,6 @@ Content-Type: application/json
 }
 ```
 
-### WebSocket Connection
-```javascript
-const ws = new WebSocket('wss://localhost:8000/ws/SESSION_ID');
-
-ws.send(JSON.stringify({
-    type: 'chat',
-    user_id: 'USER_ID',
-    content: 'Your message',
-    attachments: []
-}));
-```
-
 ### A2A Protocol Message Format
 ```json
 {
@@ -355,7 +343,7 @@ The platform implements proper A2A protocol with dynamic agent discovery:
 const a2aMessage = {
     id: "msg_123",
     sender_id: "user_456",
-    recipient_id: "orchestrator-main",
+    recipient_id: "orchestrator",
     message_type: "chat_request",
     content: {
         session_id: "session_789",
@@ -375,37 +363,6 @@ fetch('https://localhost:8000', {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(a2aMessage)
 });
-```
-
-#### Agent Capability Query
-```json
-{
-    "id": "cap_query_123",
-    "sender_id": "orchestrator-main",
-    "recipient_id": "cybersecurity-agent-01",
-    "message_type": "capability_query",
-    "content": {
-        "request": "agent_capabilities"
-    }
-}
-```
-
-#### Agent Capability Response
-```json
-{
-    "agent_id": "cybersecurity-agent-01",
-    "agent_type": "cybersecurity",
-    "capabilities": [
-        "security_analysis",
-        "threat_detection",
-        "vulnerability_scan",
-        "security_policy",
-        "incident_response"
-    ],
-    "description": "Specialized agent for cybersecurity analysis",
-    "version": "1.0.0",
-    "status": "online"
-}
 ```
 
 ## 🔧 Configuration

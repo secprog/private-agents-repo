@@ -20,6 +20,10 @@ orchestrator_core = OrchestratorCore()
 
 # Create A2A server using ADK SDK directly
 root_agent = orchestrator_core.workflow_agent
+
+# Generate dynamic skills from discovered sub-agents
+dynamic_skills = orchestrator_core.get_skills_from_sub_agents()
+
 agent_card = AgentCard(
     name=orchestrator_core.agent_id,
     url="http://0.0.0.0:8000",
@@ -31,17 +35,17 @@ agent_card = AgentCard(
                 "uri": "urn:orquestrator:artifact-upload:v1",
                 "description": "File Upload chunked (start/append/finish).",
                 "required": False,
-                "params": {"maxChunkBytes": 1000000}, #1MB
+                "params": {"maxChunkBytes": 1000000},  # 1MB
             }
         ]
     },
-    skills=[],
+    skills=dynamic_skills,  # Use dynamically generated skills
     defaultInputModes=["text/plain"],
     defaultOutputModes=["text/plain"],
     supportsAuthenticatedExtendedCard=False,
+    preferred_transport="JSONRPC",
 )
-app = to_a2a(root_agent, port=8000, agent_card=agent_card)
-
+app = to_a2a(root_agent, port=8000, agent_card=agent_card) 
 
 # Add A2A Upload middleware
 app.add_middleware(A2AUploadMiddleware)
@@ -55,26 +59,7 @@ app.add_middleware(
     allow_headers=["*", "X-A2A-Extensions"],  # Explicitly allow A2A extension header
 )
 
-# Add custom endpoints to the A2A app
-@app.route("/health", methods=["GET"])
-async def health_check(request):
-    """Health check endpoint"""
-    from starlette.responses import JSONResponse
-
-    return JSONResponse({"status": "healthy", "agent_id": orchestrator_core.agent_id})
-
-# Add startup and shutdown handlers to A2A app
-@app.on_event("startup")
-async def startup_event():
-    """Initialize orchestrator on startup"""
-    await orchestrator_core.initialize()
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    await orchestrator_core.session_service.close()
-
+# No custom endpoints needed - ADK/A2A only uses .well-known/agent-card.json
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

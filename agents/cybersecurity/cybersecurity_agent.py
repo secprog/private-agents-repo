@@ -30,7 +30,7 @@ agent_card = AgentCard(
     defaultOutputModes=["text/plain"],
     supportsAuthenticatedExtendedCard=False,
 )
-app = to_a2a(root_agent, port=8001, agent_card=agent_card)
+app = to_a2a(root_agent, port=8001)
 
 # Add CORS middleware to A2A app
 app.add_middleware(
@@ -42,11 +42,7 @@ app.add_middleware(
 )
 
 # Add custom endpoints to the A2A app
-@app.route("/health", methods=["GET"])
-async def health_check(request):
-    """Health check endpoint"""
-    from starlette.responses import JSONResponse
-    return JSONResponse({"status": "healthy", "agent_id": cybersecurity_core.agent_id})
+# No custom endpoints needed - ADK/A2A only uses .well-known/agent-card.json
 
 
 # Add startup and shutdown handlers to A2A app

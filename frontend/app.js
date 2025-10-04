@@ -153,6 +153,7 @@ class AgentPlatform {
         this.apiEndpoint = localStorage.getItem('apiEndpoint') || 'http://localhost:8000';
         this.sessionId = null; // Will be set when user creates or loads a session
         this.sessionsListContainer = null; // Reference to sessions list container
+        this.currentAgentName = null; // Default agent name, will be updated from agent card
         
         // Add debugging to track sessionId changes
         let originalSessionId = this.sessionId;
@@ -183,13 +184,196 @@ class AgentPlatform {
     init() {
         this.setupEventListeners();
         this.loadSessions();
-        this.loadAgents();
+        
+        // Initialize input controls as disabled until agent status is determined
+        this.updateInputControlsState(false);
+        
+        // This will handle both agent connection and sub-agent loading
+        this.updateOrchestratorHeader();
         this.applyTheme();
         this.initializePushNotifications();
     }
     
     generateSessionId() {
         return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+    
+    async updateOrchestratorHeader() {
+        const { retryAttempts, retryInterval } = this.getRetryConfig();
+        
+        // Show initial loading state
+        this.showConnectionStatus('Connecting to agent...', 'loading');
+        
+        const result = await this.retryAgentConnection(retryAttempts, retryInterval);
+        
+        if (result.success) {
+            try {
+                const orchestratorEndpoint = this.apiEndpoint || 'http://localhost:8000';
+                const response = await fetch(`${orchestratorEndpoint}/.well-known/agent-card.json`);
+                
+                if (response.ok) {
+                    const agentCard = await response.json();
+                    const agentName = agentCard.name || 'Agent Name';
+                    
+                    // Store the current agent name for use throughout the app
+                    this.currentAgentName = agentName;
+                    
+                    const agentBadge = document.querySelector('.agent-badge');
+                    const statusDot = document.querySelector('.agent-indicator .status-dot');
+                    
+                    if (agentBadge) {
+                        agentBadge.textContent = agentName;
+                    }
+                    
+                    if (statusDot) {
+                        statusDot.className = 'status-dot online';
+                    }
+                    
+                    // Show/hide the "Get Authenticated Agent Card" button based on supportsAuthenticatedExtendedCard
+                    this.updateAuthenticatedAgentCardButton(agentCard.supportsAuthenticatedExtendedCard);
+                    
+                    // Extract sub-agents from the orchestrator card
+                    this.extractSubAgents(agentCard);
+                    
+                    // Enable input controls since agent is online
+                    this.updateInputControlsState(true);
+                } else {
+                    this.setOrchestratorFallback();
+                }
+            } catch (error) {
+                console.error('Failed to fetch orchestrator agent card:', error);
+                this.setOrchestratorFallback();
+            }
+        } else {
+            // All retry attempts failed
+            this.setOrchestratorFallback();
+        }
+    }
+    
+    setOrchestratorFallback() {
+        const agentBadge = document.querySelector('.agent-badge');
+        const statusDot = document.querySelector('.agent-indicator .status-dot');
+        
+        if (agentBadge) {
+            agentBadge.textContent = 'Agent Name';
+        }
+        
+        if (statusDot) {
+            statusDot.className = 'status-dot offline';
+        }
+        
+        // Hide the authenticated agent card button when there's an error
+        this.updateAuthenticatedAgentCardButton(false);
+        
+        // Disable input controls since agent is offline
+        this.updateInputControlsState(false);
+    }
+    
+    updateAuthenticatedAgentCardButton(supportsAuthenticatedExtendedCard) {
+        const getAgentCardBtn = document.getElementById('getAgentCardBtn');
+        if (getAgentCardBtn) {
+            // Show button only if explicitly set to true, hide otherwise (including undefined/null)
+            if (supportsAuthenticatedExtendedCard === true) {
+                getAgentCardBtn.style.display = 'inline-block';
+                console.log('✅ Authenticated Agent Card button shown - agent supports authenticated extended cards');
+            } else {
+                getAgentCardBtn.style.display = 'none';
+                console.log('❌ Authenticated Agent Card button hidden - agent does not support authenticated extended cards');
+            }
+        }
+    }
+    
+    updateInputControlsState(isAgentOnline) {
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const attachBtn = document.getElementById('attachBtn');
+        
+        if (messageInput) {
+            messageInput.disabled = !isAgentOnline;
+            if (isAgentOnline) {
+                messageInput.placeholder = 'Type your message... (Press Enter to send, Shift+Enter for new line)';
+            } else {
+                messageInput.placeholder = 'Agent is offline - please wait for connection...';
+            }
+        }
+        
+        if (sendBtn) {
+            sendBtn.disabled = !isAgentOnline;
+        }
+        
+        if (newChatBtn) {
+            newChatBtn.disabled = !isAgentOnline;
+        }
+        
+        if (attachBtn) {
+            attachBtn.disabled = !isAgentOnline;
+        }
+        
+        console.log(`🔄 Input controls ${isAgentOnline ? 'enabled' : 'disabled'} - agent is ${isAgentOnline ? 'online' : 'offline'}`);
+    }
+    
+    // Sleep utility function
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+    
+    // Get retry configuration from settings
+    getRetryConfig() {
+        const retryAttempts = parseInt(localStorage.getItem('retryAttempts')) || 3;
+        const retryInterval = parseInt(localStorage.getItem('retryInterval')) || 2;
+        return { retryAttempts, retryInterval };
+    }
+    
+    // Retry mechanism for agent connection
+    async retryAgentConnection(maxAttempts, intervalSeconds) {
+        console.log(`🔄 Starting agent connection retry: ${maxAttempts} attempts, ${intervalSeconds}s interval`);
+        this.showToast(`Starting connection retry: ${maxAttempts} attempts`, 'info');
+        
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                console.log(`🔄 Connection attempt ${attempt}/${maxAttempts}`);
+                this.showToast(`Connection attempt ${attempt}/${maxAttempts}`, 'info');
+                
+                const orchestratorEndpoint = this.apiEndpoint || 'http://localhost:8000';
+                const response = await fetch(`${orchestratorEndpoint}/.well-known/agent-card.json`);
+                
+                if (response.ok) {
+                    console.log(`✅ Agent connection successful on attempt ${attempt}`);
+                    this.showToast(`✅ Connected successfully on attempt ${attempt}`, 'success');
+                    return { success: true, attempt };
+                } else {
+                    console.log(`❌ Agent connection failed on attempt ${attempt}: ${response.status}`);
+                    this.showToast(`❌ Attempt ${attempt} failed (${response.status})`, 'error');
+                }
+            } catch (error) {
+                console.log(`❌ Agent connection error on attempt ${attempt}:`, error.message);
+                this.showToast(`❌ Attempt ${attempt} failed: ${error.message}`, 'error');
+            }
+            
+            // Don't sleep after the last attempt
+            if (attempt < maxAttempts) {
+                console.log(`⏳ Waiting ${intervalSeconds} seconds before next attempt...`);
+                this.showToast(`⏳ Waiting ${intervalSeconds}s before next attempt...`, 'info');
+                await this.sleep(intervalSeconds * 1000);
+            }
+        }
+        
+        console.log(`❌ All ${maxAttempts} connection attempts failed`);
+        this.showToast(`❌ All ${maxAttempts} connection attempts failed`, 'error');
+        return { success: false, attempt: maxAttempts };
+    }
+    
+    // Show connection status message
+    showConnectionStatus(message, type = 'info') {
+        console.log(`🔗 Connection Status: ${message}`);
+        this.showToast(message, type);
+        
+        // Update agent badge with connection status
+        const agentBadge = document.querySelector('.agent-badge');
+        if (agentBadge && type === 'loading') {
+            agentBadge.textContent = 'Connecting...';
+        }
     }
     
     generateTaskId() {
@@ -266,10 +450,10 @@ class AgentPlatform {
             deleteAllBtn.addEventListener('click', () => this.deleteAllSessions());
         }
         
-        // Clear chat button
-        const clearChatBtn = document.getElementById('clearChatBtn');
-        if (clearChatBtn) {
-            clearChatBtn.addEventListener('click', () => this.clearChat());
+        // Theme toggle button
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => this.toggleTheme());
         }
         
         // Export chat button
@@ -726,10 +910,6 @@ class AgentPlatform {
             const response = await this.getAgentCard();
             const agentCard = response.result || response;
             
-            // Display agent card in a modal or console
-            console.log('Agent Card:', agentCard);
-            this.showToast('Agent card loaded - check console for details', 'success');
-            
             // You could also display this in a modal or dedicated section
             this.displayAgentCard(agentCard);
         } catch (error) {
@@ -740,20 +920,70 @@ class AgentPlatform {
     
     // Display agent card information
     displayAgentCard(agentCard) {
-        // Create a simple display of the agent card
-        const cardInfo = `
-Agent Card Information:
-- Name: ${agentCard.name || 'N/A'}
-- Description: ${agentCard.description || 'N/A'}
-- Version: ${agentCard.version || 'N/A'}
-- Capabilities: ${agentCard.capabilities ? agentCard.capabilities.join(', ') : 'N/A'}
+        const section = document.getElementById('agentCardSection');
+        const content = document.getElementById('agentCardContent');
+        
+        // Create a structured display of the agent card
+        const cardHTML = `
+            <div class="agent-info-section">
+                <div class="agent-info-item">
+                    <i class="fas fa-robot info-icon"></i>
+                    <div class="info-content">
+                        <div class="info-label">Agent Name</div>
+                        <div class="info-value">${agentCard.name || 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="agent-info-item">
+                    <i class="fas fa-info-circle info-icon"></i>
+                    <div class="info-content">
+                        <div class="info-label">Description</div>
+                        <div class="info-value">${agentCard.description || 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="agent-info-item">
+                    <i class="fas fa-tag info-icon"></i>
+                    <div class="info-content">
+                        <div class="info-label">Version</div>
+                        <div class="info-value">${agentCard.version || 'N/A'}</div>
+                    </div>
+                </div>
+                
+                <div class="agent-info-item">
+                    <i class="fas fa-cogs info-icon"></i>
+                    <div class="info-content">
+                        <div class="info-label">Capabilities</div>
+                        <div class="info-value">
+                            ${agentCard.capabilities && agentCard.capabilities.length > 0 
+                                ? `<div class="capabilities-list">
+                                    ${agentCard.capabilities.map(cap => `<span class="capability-tag">${cap}</span>`).join('')}
+                                   </div>`
+                                : 'N/A'
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
         `;
         
-        // You could show this in a modal or dedicated section
-        console.log(cardInfo);
+        content.innerHTML = cardHTML;
+        section.style.display = 'block';
+        
+        // Show success message
+        this.showToast('Agent card loaded successfully', 'success');
     }
     
     async sendMessage() {
+        // Check if agent is online before allowing message sending
+        const statusDot = document.querySelector('.agent-indicator .status-dot');
+        const isAgentOnline = statusDot && statusDot.classList.contains('online');
+        
+        if (!isAgentOnline) {
+            this.showToast('Cannot send message - agent is offline', 'error');
+            return;
+        }
+        
         const messageInput = document.getElementById('messageInput');
         const content = messageInput.value.trim();
         
@@ -881,7 +1111,7 @@ Agent Card Information:
                 type: 'agent',
                 content: `❌ **Error**: ${errorMessage}`,
                 timestamp: new Date().toISOString(),
-                agent: 'orchestrator-main'
+                agent: this.currentAgentName
             }, true, capturedSessionId);
             return;
         }
@@ -934,7 +1164,7 @@ Agent Card Information:
                                         type: 'agent',
                                         content: part.text,
                                         timestamp: taskStatus.timestamp || new Date().toISOString(),
-                                        agent: 'orchestrator-main'
+                                        agent: this.currentAgentName
                                     }, true, capturedSessionId);
                                 }
                             });
@@ -957,7 +1187,7 @@ Agent Card Information:
                         type: latestMessage.role === 'user' ? 'user' : 'agent',
                         content: this.formatA2AMessage(latestMessage),
                         timestamp: new Date().toISOString(),
-                        agent: latestMessage.role === 'agent' ? 'orchestrator-main' : null
+                        agent: latestMessage.role === 'agent' ? this.currentAgentName : null
                     }, true, capturedSessionId);
                 }
             }
@@ -970,7 +1200,7 @@ Agent Card Information:
             type: 'agent',
                 content: '⚠️ **Warning**: Received unexpected response format. Check console for details.',
             timestamp: new Date().toISOString(),
-                agent: 'orchestrator-main'
+                agent: this.currentAgentName
             }, true, capturedSessionId);
         }
     }
@@ -1007,7 +1237,7 @@ Agent Card Information:
                 type: 'agent',
                 content: `✅ **Task Completed**\n\n${this.formatA2AMessage(task.status.message)}`,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: 'orchestrator-main'
+                agent: this.currentAgentName
             }, true, sessionId);
         }
     }
@@ -1024,7 +1254,7 @@ Agent Card Information:
                 type: 'agent',
                 content: `❌ **Task Failed**\n\n${this.formatA2AMessage(task.status.message)}`,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: 'orchestrator-main'
+                agent: this.currentAgentName
             }, true, sessionId);
         }
     }
@@ -1041,7 +1271,7 @@ Agent Card Information:
                 type: 'agent',
                 content: `🔄 **Task Running**\n\n${this.formatA2AMessage(task.status.message)}`,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: 'orchestrator-main'
+                agent: this.currentAgentName
             }, true, sessionId);
         }
     }
@@ -1058,7 +1288,7 @@ Agent Card Information:
                 type: 'agent',
                 content: `⏳ **Task Waiting**\n\n${this.formatA2AMessage(task.status.message)}`,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: 'orchestrator-main'
+                agent: this.currentAgentName
             }, true, sessionId);
         }
     }
@@ -1325,44 +1555,41 @@ Agent Card Information:
         this.updateAttachmentsPreview();
     }
     
-    async loadAgents() {
-        try {
-            // Use A2A protocol well-known agent card discovery
-            this.agents = [];
-            
-            // Discover other agents using A2A well-known agent card endpoints
-            const knownEndpoints = [
-                { port: 8001, type: 'Cybersecurity', id: 'cybersecurity-agent-01' },
-                { port: 8002, type: 'DevOps', id: 'devops-agent-01' }
-            ];
-            
-            for (const agent of knownEndpoints) {
-                try {
-                    const endpoint = `http://localhost:${agent.port}`;
-                    const response = await fetch(`${endpoint}/.well-known/agent-card.json`);
-                    if (response.ok) {
-                        const agentCard = await response.json();
-                        this.agents.push({
-                            agent_id: agent.id,
-                            agent_type: agent.type,
-                    status: 'online',
-                            capabilities: agentCard.capabilities || [],
-                            endpoint: endpoint,
-                            agent_card: agentCard
-                        });
-                    }
-                } catch (e) {
-                    console.log(`Agent at port ${agent.port} not available`);
-                }
+    // Extract sub-agent information from orchestrator card
+    extractSubAgents(orchestratorCard) {
+        this.agents = [];
+        
+        // Extract sub-agent information from skills section
+        const skills = orchestratorCard.skills || [];
+        
+        for (const skill of skills) {
+            // Skip the orchestrator's own skill (orchestration)
+            if (skill.id === 'orchestration') {
+                continue;
             }
             
-            this.updateAgentsList();
-            this.showToast(`Connected to Agent Platform (${this.agents.length} agents)`, 'success');
-        } catch (error) {
-            console.error('Error loading agents:', error);
-            this.showToast('Failed to load agents', 'error');
+            // Extract sub-agent info from skill tags
+            const subAgentTag = skill.tags?.find(tag => tag.startsWith('sub_agent:'));
+            if (subAgentTag) {
+                const agentId = subAgentTag.replace('sub_agent:', '');
+                
+                this.agents.push({
+                    agent_id: agentId,
+                    status: 'online',
+                    capabilities: skill.tags || [],
+                    agent_card: {
+                        name: skill.name,
+                        description: skill.description,
+                        skills: [skill]
+                    }
+                });
+            }
         }
+        
+        this.updateAgentsList();
+        this.showToast(`Connected to Agent Platform (${this.agents.length} sub-agents)`, 'success');
     }
+    
     
     updateAgentsList() {
         const agentsList = document.getElementById('agentsList');
@@ -1373,15 +1600,17 @@ Agent Card Information:
             li.className = 'agent-item';
             li.innerHTML = `
                 <div class="agent-info">
-                    <div class="agent-icon">
+                    <div class="agent-icon" style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-color); display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; color: white; font-size: 0.875rem;">
                         <i class="fas fa-robot"></i>
                     </div>
-                    <div>
+                    <div style="flex: 1; min-width: 0;">
                         <div class="agent-name">${agent.agent_id}</div>
-                        <div class="agent-type">${agent.agent_type || 'General'}</div>
+                        <div class="agent-description" 
+                             style="word-wrap: break-word; white-space: normal; max-width: 200px; font-size: 0.85em; color: #666; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; cursor: help;" 
+                             title="${agent.agent_card?.description || 'Specialized agent'}">${agent.agent_card?.description || 'Specialized agent'}</div>
                     </div>
                 </div>
-                <span class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}"></span>
+                <span class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: auto; flex-shrink: 0;"></span>
             `;
             li.addEventListener('click', () => this.showAgentDetails(agent));
             agentsList.appendChild(li);
@@ -1398,22 +1627,18 @@ Agent Card Information:
                 <p>${agent.agent_id}</p>
             </div>
             <div class="agent-detail">
-                <h4>Type</h4>
-                <p>${agent.agent_type || 'General'}</p>
+                <h4>Description</h4>
+                <p style="word-wrap: break-word; white-space: normal; max-width: 100%; line-height: 1.4; font-size: 0.9em; color: #666;">${agent.agent_card?.description || 'Specialized agent'}</p>
             </div>
             <div class="agent-detail">
                 <h4>Status</h4>
-                <p><span class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}"></span> ${agent.status}</p>
+                <p><span class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span> ${agent.status}</p>
             </div>
             <div class="agent-detail">
                 <h4>Capabilities</h4>
                 <ul>
                     ${(agent.capabilities || []).map(cap => `<li>${cap}</li>`).join('')}
                 </ul>
-            </div>
-            <div class="agent-detail">
-                <h4>Endpoint</h4>
-                <p>${agent.endpoint}</p>
             </div>
         `;
         
@@ -1801,7 +2026,7 @@ Agent Card Information:
                                     type: msg.role === 'user' ? 'user' : 'agent',
                                     content: this.formatA2AMessage(msg),
                                     timestamp: new Date().toISOString(),
-                                    agent: msg.role === 'agent' ? 'orchestrator-main' : null,
+                                    agent: msg.role === 'agent' ? this.currentAgentName : null,
                                     taskId: taskId
                                 });
                             });
@@ -2055,6 +2280,10 @@ Agent Card Information:
         document.getElementById('llmProvider').value = localStorage.getItem('llmProvider') || 'azure';
         document.getElementById('apiEndpoint').value = this.apiEndpoint;
         
+        // Load retry configuration
+        document.getElementById('retryAttempts').value = localStorage.getItem('retryAttempts') || '3';
+        document.getElementById('retryInterval').value = localStorage.getItem('retryInterval') || '2';
+        
         // Load notification preferences - check actual permission status
         const notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
         const hasPermission = 'Notification' in window && Notification.permission === 'granted';
@@ -2076,6 +2305,13 @@ Agent Card Information:
         localStorage.setItem('llmProvider', provider);
         localStorage.setItem('apiEndpoint', endpoint);
         
+        // Save retry configuration
+        const retryAttempts = document.getElementById('retryAttempts').value;
+        const retryInterval = document.getElementById('retryInterval').value;
+        
+        localStorage.setItem('retryAttempts', retryAttempts);
+        localStorage.setItem('retryInterval', retryInterval);
+        
         // Save notification preferences
         const notificationsEnabled = document.getElementById('notificationsEnabled').checked;
         const taskCompletedNotifications = document.getElementById('taskCompletedNotifications').checked;
@@ -2090,8 +2326,8 @@ Agent Card Information:
         // Update upload service endpoint
         this.uploadService.apiEndpoint = endpoint;
         
-        // Reload agents with new endpoint
-        this.loadAgents();
+        // Update orchestrator header with new endpoint (this will also reload sub-agents)
+        this.updateOrchestratorHeader();
         
         this.hideSettings();
         this.showToast('Settings saved successfully', 'success');
@@ -2102,9 +2338,26 @@ Agent Card Information:
         this.applyTheme();
     }
     
+    toggleTheme() {
+        const currentTheme = localStorage.getItem('theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        this.changeTheme(newTheme);
+        this.updateThemeIcon(newTheme);
+    }
+    
+    updateThemeIcon(theme) {
+        const themeIcon = document.getElementById('themeIcon');
+        if (themeIcon) {
+            themeIcon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
+    }
+    
     applyTheme() {
         const theme = localStorage.getItem('theme') || 'dark';
         document.body.className = `theme-${theme}`;
+        
+        // Update theme toggle icon
+        this.updateThemeIcon(theme);
         
         // Update button states to match the applied theme
         document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -2232,6 +2485,7 @@ Agent Card Information:
             modal.style.display = 'none';
         }
     }
+    
     
     updateTaskStatus(taskId, status) {
         console.log(`Task ${taskId} status:`, status);

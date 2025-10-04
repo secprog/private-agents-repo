@@ -28,7 +28,7 @@ class CyberSecurityCore:
     """ADK-based cybersecurity agent core functionality"""
     
     def __init__(self):
-        self.agent_id = "cybersecurity-agent-01"
+        self.agent_id = "cybersecurity-agent"
         self.endpoint = os.getenv('CYBERSECURITY_AGENT_ENDPOINT', 'https://cybersecurity-agent:8001')
         
         # Initialize ADK LLM agent directly
@@ -65,48 +65,13 @@ class CyberSecurityCore:
     async def initialize(self):
         """Initialize cybersecurity agent"""
         try:
-            # Register with orchestrator
-            await self.register_with_orchestrator()
-            
+            # No registration needed - A2A protocol uses .well-known/agent-card.json discovery
             logger.info("CyberSecurity agent initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize agent: {e}")
             raise
     
-    async def register_with_orchestrator(self):
-        """Register this agent with the orchestrator"""
-        try:
-            orchestrator_endpoint = os.getenv('ORCHESTRATOR_ENDPOINT', 'https://orchestrator:8000')
-            
-            registration_message = A2AMessage(
-                id=str(uuid.uuid4()),
-                sender_id=self.agent_id,
-                recipient_id="orchestrator-main",
-                message_type="agent_registration",
-                content={
-                    "agent_id": self.agent_id,
-                    "endpoint": self.endpoint,
-                    "capabilities": self.capabilities,
-                    "description": "Cybersecurity agent for security analysis, vulnerability scanning, and threat detection"
-                }
-            )
-            
-            # Send registration to orchestrator
-            verify_ssl = os.getenv('VERIFY_SSL', 'true').lower() == 'true'
-            async with httpx.AsyncClient(verify=verify_ssl) as client:
-                response = await client.post(
-                    f"{orchestrator_endpoint}",
-                    json=registration_message.dict(),
-                    timeout=30.0
-                )
-                
-                if response.status_code == 200:
-                    logger.info(f"✅ Successfully registered {self.agent_id} with orchestrator")
-                else:
-                    logger.warning(f"⚠️ Registration response: {response.status_code}")
-                    
-        except Exception as e:
-            logger.error(f"Failed to register with orchestrator: {e}")
+    # Registration removed - A2A protocol uses .well-known/agent-card.json discovery, not message-based registration
     
     
     def get_capabilities(self) -> List[str]:

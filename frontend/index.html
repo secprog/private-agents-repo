@@ -44,7 +44,7 @@
             
             <div class="sidebar-footer">
                 <div class="user-profile">
-                    <img src="https://placehold.co/32" alt="User" class="user-avatar">
+                    <i class="fas fa-user user-avatar-icon"></i>
                     <span class="user-name">User</span>
                 </div>
             </div>
@@ -57,13 +57,13 @@
                 <div class="header-left">
                     <h1 id="chatTitle">New Conversation</h1>
                     <div class="agent-indicator" id="activeAgent">
-                        <span class="agent-badge">Orchestrator</span>
-                        <span class="status-dot online"></span>
+                        <span class="agent-badge">Agent Loading...</span>
+                        <span class="status-dot loading"></span>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-icon" id="clearChatBtn" title="Clear Chat">
-                        <i class="fas fa-broom"></i>
+                    <button class="btn-icon" id="themeToggleBtn" title="Toggle Theme">
+                        <i class="fas fa-moon" id="themeIcon"></i>
                     </button>
                     <button class="btn-icon" id="exportChatBtn" title="Export Chat">
                         <i class="fas fa-download"></i>
@@ -190,7 +190,7 @@
                     <div class="task-controls">
                         <button class="btn btn-secondary" id="cancelAllTasksBtn">Cancel All Tasks</button>
                         <button class="btn btn-secondary" id="refreshTaskStatusBtn">Refresh Task Status</button>
-                        <button class="btn btn-secondary" id="getAgentCardBtn">Get Agent Card</button>
+                        <button class="btn btn-secondary" id="getAgentCardBtn" style="display: none;">Get Authenticated Agent Card</button>
                     </div>
                 </div>
                 <div class="settings-section">
@@ -208,6 +208,30 @@
                             <input type="checkbox" id="taskFailedNotifications" checked>
                             Task Failed
                         </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Connection Settings</h3>
+                    <div class="connection-controls">
+                        <div class="form-group">
+                            <label for="retryAttempts">Retry Attempts</label>
+                            <input type="number" id="retryAttempts" class="form-input" min="1" max="10" value="3">
+                            <small>Number of times to retry connecting to agent</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="retryInterval">Retry Interval (seconds)</label>
+                            <input type="number" id="retryInterval" class="form-input" min="1" max="30" value="5">
+                            <small>Seconds to wait between retry attempts</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Agent Card Section -->
+                <div class="settings-section" id="agentCardSection" style="display: none;">
+                    <h3><i class="fas fa-robot"></i>Authenticated Agent Information</h3>
+                    <div class="agent-card-content" id="agentCardContent">
+                        <!-- Agent card information will be displayed here -->
                     </div>
                 </div>
             </div>
@@ -281,6 +305,7 @@
             </div>
         </div>
     </div>
+    
     
     <script src="app.js"></script>
 </body>
