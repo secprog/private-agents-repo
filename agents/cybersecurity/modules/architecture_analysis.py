@@ -158,7 +158,6 @@ Provide actionable security recommendations and risk assessments.
             artifact_data = await self.artifact_service.load_artifact_to_data(filename, session_id)
             
             if not artifact_data:
-                # Try to find the artifact in other sessions (fallback for A2A session issues)
                 logger.warning(f"Artifact {filename} not found in session {session_id}, searching across all sessions...")
                 artifact_data = await self._find_artifact_anywhere(filename)
                 
@@ -220,7 +219,7 @@ Provide actionable security recommendations and risk assessments.
             raise
     
     async def _find_artifact_anywhere(self, filename: str):
-        """Find artifact across all sessions by searching the filesystem (fallback for A2A session issues)"""
+        """Find artifact across all sessions by searching the filesystem"""
         try:
             import os
             

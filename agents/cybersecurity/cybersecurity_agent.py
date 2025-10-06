@@ -6,9 +6,9 @@ import logging
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
-from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.agents import Agent
 from modules.architecture_analysis import architecture_sub_agent
+from modules.custom_a2a import create_a2a_server_with_shared_session
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +26,7 @@ root_agent = Agent(
     sub_agents=[architecture_sub_agent]
 )
 
-app = to_a2a(root_agent, port=8001, host=agent_name, protocol="http")
+app = create_a2a_server_with_shared_session(root_agent, port=8001, host=agent_name, protocol="http")
 
 # Add CORS middleware to A2A app
 app.add_middleware(

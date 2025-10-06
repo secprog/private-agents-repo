@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 # Import our artifact service and models
-from modules.artifact_service import ArtifactServiceWrapper, create_artifact_service
+from shared.artifacts.artifact_service import ArtifactServiceWrapper, create_artifact_service
 
 logger = logging.getLogger(__name__)
 
