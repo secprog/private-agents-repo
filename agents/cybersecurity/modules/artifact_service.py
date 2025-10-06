@@ -118,13 +118,18 @@ class ArtifactServiceWrapper:
             app_name = "agent-platform"
             user_id = "default-user"
             
+            logger.info(f"Loading artifact: filename='{filename}', session_id='{session_id}', version={version}")
+            logger.info(f"Using app_name='{app_name}', user_id='{user_id}'")
+            
             # Handle user: prefix in filename
             actual_filename = filename
             if filename.startswith("user:"):
                 # Keep the user: prefix for ADK
                 actual_filename = filename
+                logger.info(f"User artifact detected, keeping prefix: '{actual_filename}'")
             
             # Load artifact using correct ADK method signature
+            logger.info(f"Calling ADK load_artifact with: app_name='{app_name}', user_id='{user_id}', session_id='{session_id}', filename='{actual_filename}', version={version}")
             part = await self.artifact_service.load_artifact(
                 app_name=app_name,
                 user_id=user_id,
@@ -133,7 +138,10 @@ class ArtifactServiceWrapper:
                 version=version
             )
             
+            logger.info(f"ADK load_artifact returned: part={part is not None}, inline_data={part.inline_data is not None if part else False}")
+            
             if not part or not part.inline_data:
+                logger.warning(f"No artifact data found for filename='{actual_filename}', session_id='{session_id}'")
                 return None
             
             # Encode to base64
@@ -142,17 +150,28 @@ class ArtifactServiceWrapper:
             
             # Determine namespace for return
             namespace = "user" if filename.startswith("user:") else f"session:{session_id}"
+            logger.error(
+                f"ArtifactData: "
+                f"filename={actual_filename}, "
+                f"mime_type={part.inline_data.mime_type}, "
+                f"data={base64_data}, "
+                f"version={version}, "  # This will be None if latest was loaded, or the specific version if requested
+                f"namespace={namespace}"
+            )
             
             return ArtifactData(
                 filename=actual_filename,
                 mime_type=part.inline_data.mime_type,
                 data=base64_data,
-                version=version,
+                version=version,  # This will be None if latest was loaded, or the specific version if requested
                 namespace=namespace
             )
             
         except Exception as e:
             logger.error(f"Failed to load artifact: {e}")
+            logger.error(f"Exception type: {type(e)}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return None
     
     def list_artifacts(self, session_id: str, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -162,7 +181,9 @@ class ArtifactServiceWrapper:
             
             # List session artifacts
             session_namespace = f"session:{session_id}"
+            logger.info(f"Listing artifacts for session namespace: '{session_namespace}'")
             session_files = self.artifact_service.list_artifacts(session_namespace)
+            logger.info(f"Found {len(session_files)} session artifacts: {session_files}")
             for filename in session_files:
                 artifacts.append({
                     "filename": filename,
@@ -173,7 +194,9 @@ class ArtifactServiceWrapper:
             # List user artifacts if user_id provided
             if user_id:
                 user_namespace = "user"
+                logger.info(f"Listing artifacts for user namespace: '{user_namespace}'")
                 user_files = self.artifact_service.list_artifacts(user_namespace)
+                logger.info(f"Found {len(user_files)} user artifacts: {user_files}")
                 for filename in user_files:
                     artifacts.append({
                         "filename": filename,
@@ -181,6 +204,7 @@ class ArtifactServiceWrapper:
                         "user_id": user_id
                     })
             
+            logger.info(f"Total artifacts found: {len(artifacts)}")
             return artifacts
             
         except Exception as e:

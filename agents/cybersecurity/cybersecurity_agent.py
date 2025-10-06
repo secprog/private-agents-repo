@@ -6,8 +6,9 @@ import logging
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
-from modules.cybersecurity_core import CyberSecurityCore
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from google.adk.agents import Agent
+from modules.architecture_analysis import architecture_sub_agent
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -15,10 +16,15 @@ logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
-cybersecurity_core = CyberSecurityCore(agent_name)
 
 # Create A2A server using ADK SDK directly
-root_agent = cybersecurity_core.agent
+root_agent = Agent(
+    name=agent_name.replace("-", "_"),
+    description="Specialized agent for cybersecurity.",
+    model="gemini-2.0-flash",
+    instruction="For cybersecurity tasks, you delegate to the most appropriate sub-agent.",
+    sub_agents=[architecture_sub_agent]
+)
 
 app = to_a2a(root_agent, port=8001, host=agent_name, protocol="http")
 

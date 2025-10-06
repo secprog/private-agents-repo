@@ -320,8 +320,8 @@ class AgentPlatform {
     
     // Get retry configuration from settings
     getRetryConfig() {
-        const retryAttempts = parseInt(localStorage.getItem('retryAttempts')) || 3;
-        const retryInterval = parseInt(localStorage.getItem('retryInterval')) || 2;
+        const retryAttempts = parseInt(localStorage.getItem('retryAttempts')) || parseInt(document.getElementById('retryAttempts').value);
+        const retryInterval = parseInt(localStorage.getItem('retryInterval')) || parseInt(document.getElementById('retryInterval').value);
         return { retryAttempts, retryInterval };
     }
     
