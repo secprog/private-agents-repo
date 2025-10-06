@@ -27,14 +27,15 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - CYBERSECURITY_AGENT_ENDPOINT=${CYBERSECURITY_AGENT_ENDPOINT}
-      - DEVOPS_AGENT_ENDPOINT=${DEVOPS_AGENT_ENDPOINT}
+      - ARTIFACT_SERVICE_TYPE=${ARTIFACT_SERVICE_TYPE}
+      - FILESYSTEM_ARTIFACT_PATH=${FILESYSTEM_ARTIFACT_PATH}
     depends_on:
       - postgres
     networks:
       - agent-network
     volumes:
       - ./agents/orchestrator:/app
-      - /app/__pycache__
+      - ./artifacts:/artifacts
 
   # CyberSecurity Agent (Internal - No External Ports)
   cybersecurity-agent:
@@ -47,33 +48,15 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - ORCHESTRATOR_ENDPOINT=${ORCHESTRATOR_ENDPOINT}
       - CYBERSECURITY_AGENT_ENDPOINT=${CYBERSECURITY_AGENT_ENDPOINT}
+      - ARTIFACT_SERVICE_TYPE=${ARTIFACT_SERVICE_TYPE}
+      - FILESYSTEM_ARTIFACT_PATH=${FILESYSTEM_ARTIFACT_PATH}
     depends_on:
       - orchestrator
     networks:
       - agent-network
     volumes:
       - ./agents/cybersecurity:/app
-      - /app/__pycache__
-
-  # DevOps Agent (Internal - No External Ports)
-  devops-agent:
-    build: ./agents/devops
-    container_name: ${DEVOPS_CONTAINER:-agent-platform-devops}
-    restart: always
-    ports:
-      - "${DEVOPS_PORT:-8002}:8002"
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - ORCHESTRATOR_ENDPOINT=${ORCHESTRATOR_ENDPOINT}
-      - DEVOPS_AGENT_ENDPOINT=${DEVOPS_AGENT_ENDPOINT}
-    depends_on:
-      - orchestrator
-    networks:
-      - agent-network
-    volumes:
-      - ./agents/devops:/app
-      - /app/__pycache__
-      - /var/run/docker.sock:/var/run/docker.sock  # For Docker operations
+      - ./artifacts:/artifacts
 
   # Frontend
   frontend:
@@ -91,23 +74,6 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-
-  # Nginx Reverse Proxy (optional, for production)
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: agent-platform-nginx
-  #   restart: always
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-  #     - ./nginx/ssl:/etc/nginx/ssl
-  #   depends_on:
-  #     - frontend
-  #     - orchestrator
-  #   networks:
-  #     - agent-network
 
 networks:
   agent-network:

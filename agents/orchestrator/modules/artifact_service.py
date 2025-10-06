@@ -11,10 +11,18 @@ from typing import Optional, List, Dict, Any
 from google.adk.artifacts import InMemoryArtifactService, GcsArtifactService
 from google.genai.types import Part, Blob
 
-from modules.models import ArtifactData
+from pydantic import BaseModel
 from modules.filesystem_artifact_service import FilesystemArtifactService
 
 logger = logging.getLogger(__name__)
+
+class ArtifactData(BaseModel):
+    """Artifact data model for A2A protocol"""
+    filename: str
+    mime_type: str
+    data: str  # Base64 encoded binary data
+    version: Optional[int] = None
+    namespace: Optional[str] = None  # "user:" prefix for user-scoped artifacts
 
 
 class ArtifactServiceWrapper:

@@ -1,18 +1,26 @@
 import base64, hashlib, uuid, time
 import logging
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 from starlette.requests import Request
 
-import google.genai.types as types
+from pydantic import BaseModel
+from typing import Optional
 
 # Import our artifact service and models
 from modules.artifact_service import ArtifactServiceWrapper, create_artifact_service
-from modules.models import ArtifactData
 
 logger = logging.getLogger(__name__)
 
 uploads = {} 
+
+class ArtifactData(BaseModel):
+    """Artifact data model for A2A protocol"""
+    filename: str
+    mime_type: str
+    data: str  # Base64 encoded binary data
+    version: Optional[int] = None
+    namespace: Optional[str] = None  # "user:" prefix for user-scoped artifacts
 
 class A2AUploadMiddleware(BaseHTTPMiddleware):
     """

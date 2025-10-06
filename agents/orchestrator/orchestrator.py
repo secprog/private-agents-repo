@@ -26,7 +26,7 @@ dynamic_skills = orchestrator_core.get_skills_from_sub_agents()
 
 agent_card = AgentCard(
     name=orchestrator_core.agent_id,
-    url="http://0.0.0.0:8000",
+    url="http://localhost:8000",
     description=orchestrator_core.workflow_agent.description,
     version="1.0.0",
     capabilities={
@@ -45,7 +45,7 @@ agent_card = AgentCard(
     supportsAuthenticatedExtendedCard=False,
     preferred_transport="JSONRPC",
 )
-app = to_a2a(root_agent, port=8000, agent_card=agent_card) 
+app = to_a2a(root_agent, port=8000, host="0.0.0.0", agent_card=agent_card) 
 
 # Add A2A Upload middleware
 app.add_middleware(A2AUploadMiddleware)
@@ -62,4 +62,4 @@ app.add_middleware(
 # No custom endpoints needed - ADK/A2A only uses .well-known/agent-card.json
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app)

@@ -8,7 +8,6 @@ import time
 import requests
 from typing import List
 
-from modules.models import A2AMessage
 from google.adk.agents import Agent
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent, AGENT_CARD_WELL_KNOWN_PATH
 
@@ -115,7 +114,7 @@ class OrchestratorCore:
             if self.agent_registry:
                 instruction = (
                     "You are a dispatcher orchestrator. Analyze the user's request and TRANSFER to the most appropriate sub-agent." + "\n" +
-                    "Always TRANSFER to a sub-agent rather than handling requests directly. You are allowed to greeting"
+                    "Always TRANSFER to a sub-agent rather than handling requests directly. You are allowed to greeting and answer questions about the sub-agents"
                 )
             else:
                 instruction = "Do nothing just say: No specialized sub-agents are currently available."
@@ -138,7 +137,7 @@ class OrchestratorCore:
         
         for endpoint in self.discovery_endpoints:
             try:
-                # Extract agent ID from endpoint (e.g., cybersecurity-agent from https://cybersecurity-agent:8001)
+                # Extract agent ID from endpoint (e.g., cybersecurity-agent from http://cybersecurity-agent:8001)
                 agent_id = self._extract_agent_id_from_endpoint(endpoint)
                 print(f"Agent ID: {agent_id}")
                 print(f"Discovery Endpoints: {self.discovery_endpoints}")
@@ -177,7 +176,7 @@ class OrchestratorCore:
     
     def _extract_agent_id_from_endpoint(self, endpoint: str) -> str:
         """Extract agent ID from endpoint URL"""
-        # Extract hostname from URL (e.g., cybersecurity-agent from https://cybersecurity-agent:8001)
+        # Extract hostname from URL (e.g., cybersecurity-agent from http://cybersecurity-agent:8001)
         from urllib.parse import urlparse
         parsed = urlparse(endpoint)
         hostname = parsed.hostname or parsed.netloc.split(':')[0]
