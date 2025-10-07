@@ -86,4 +86,7 @@ def create_a2a_server_with_shared_session(
     )
     
     logger.info("✅ Created A2A server with proper services")
+    logger.info(f"🔧 Session service type: {type(session_service)}")
+    logger.info(f"🔧 Artifact service type: {type(artifact_service)}")
+    logger.info(f"🔧 Agent name: {agent.name}")
     return app

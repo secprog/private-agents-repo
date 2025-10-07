@@ -12,7 +12,6 @@ from datetime import datetime
 
 from google.adk.agents import Agent
 from google.genai.types import Part, Blob
-from modules.artifact_service import create_artifact_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +50,14 @@ class ArchitectureAnalysis:
 class ArchitectureAnalyzer:
     """Advanced architecture analyzer using AI vision and multi-modal processing"""
     
-    def __init__(self):
-        self.artifact_service = create_artifact_service()
+    def __init__(self, artifact_service=None):        
+        # Store the artifact service for loading files
+        self.artifact_service = artifact_service
+        logger.info(f"🔧 ArchitectureAnalyzer initialized with artifact service: {type(artifact_service)}")
+        if hasattr(artifact_service, 'service_type'):
+            logger.info(f"🔧 Artifact service type: {artifact_service.service_type}")
+        if hasattr(artifact_service, 'artifact_service'):
+            logger.info(f"🔧 Underlying artifact service: {type(artifact_service.artifact_service)}")
         
         # Initialize specialized AI agents for different analysis tasks
         self.vision_agent = Agent(
@@ -153,18 +158,15 @@ Provide actionable security recommendations and risk assessments.
     async def analyze_architecture(self, session_id: str, filename: str) -> str:
         """Comprehensive architecture analysis using AI vision and security expertise"""
         try:
-            # Load the artifact
-            logger.info(f"🔍 Starting architecture analysis for session_id={session_id}, filename={filename}")
+            logger.info(f"Starting architecture analysis for session_id={session_id}, filename={filename}")
+            
             artifact_data = await self.artifact_service.load_artifact_to_data(filename, session_id)
-            
+
             if not artifact_data:
-                logger.warning(f"Artifact {filename} not found in session {session_id}, searching across all sessions...")
-                artifact_data = await self._find_artifact_anywhere(filename)
-                
-                if not artifact_data:
-                    raise ValueError(f"Could not load artifact: {filename}")
-            
-            logger.info(f"✅ Successfully loaded artifact: {filename} (type: {artifact_data.mime_type})")
+                logger.error(f"Could not load artifact: {filename} from session {session_id}")
+                raise ValueError(f"Could not load artifact: {filename}")
+
+            logger.info(f"Successfully loaded artifact: {filename} (type: {artifact_data.mime_type})")
             
             # Create Part object for the LLM
             binary_data = base64.b64decode(artifact_data.data)
@@ -218,33 +220,6 @@ Provide actionable security recommendations and risk assessments.
             logger.error(f"Failed to analyze architecture: {e}")
             raise
     
-    async def _find_artifact_anywhere(self, filename: str):
-        """Find artifact across all sessions by searching the filesystem"""
-        try:
-            import os
-            
-            # Look for the file in all session directories
-            artifacts_base = "./artifacts/agent-platform/default-user"
-            if os.path.exists(artifacts_base):
-                # Find all session directories
-                session_dirs = [d for d in os.listdir(artifacts_base) if d.startswith('session_')]
-                logger.info(f"Searching for {filename} in {len(session_dirs)} sessions")
-                
-                # Look for the file in each session
-                for session_dir in session_dirs:
-                    file_path = os.path.join(artifacts_base, session_dir, filename)
-                    if os.path.exists(file_path):
-                        logger.info(f"Found file in session: {session_dir}")
-                        # Try to load from this session
-                        artifact_data = await self.artifact_service.load_artifact_to_data(filename, session_dir)
-                        if artifact_data:
-                            logger.info(f"Successfully loaded artifact from session: {session_dir}")
-                            return artifact_data
-            
-            return None
-        except Exception as e:
-            logger.error(f"Error searching for artifact: {e}")
-            return None
     
     async def _perform_visual_analysis(self, part: Part, filename: str) -> Dict[str, Any]:
         """Perform detailed visual analysis of the architecture diagram"""
@@ -580,17 +555,8 @@ Analysis of **{metadata.get('filename', 'unknown')}** identified:
         except Exception as e:
             return f"Error generating report: {e}"
 
-# Create global instance
-architecture_analyzer = ArchitectureAnalyzer()
-
-# Create architecture analysis sub-agent
-architecture_sub_agent = Agent(
-    name="architecture_analyzer",
-    description="Specialized sub-agent for analyzing system architecture diagrams",
-    model="gemini-2.0-flash",
-    instruction="Analyze architecture diagrams and extract components, connections, technologies, and security domains",
-    tools=[architecture_analyzer.analyze_architecture, architecture_analyzer.generate_security_report]
-)
+# Note: ArchitectureAnalyzer instance and sub-agent are now created in cybersecurity_agent.py
+# to properly inject the artifact service dependency
 
 
         

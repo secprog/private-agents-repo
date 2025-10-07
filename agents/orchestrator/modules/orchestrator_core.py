@@ -98,6 +98,9 @@ class OrchestratorCore:
                 
                 sub_agents.append(remote_agent)
                 logger.info(f"✅ Created sub-agent: {agent_id}")
+                logger.info(f"🔗 Sub-agent endpoint: {agent_info['endpoint']}")
+                logger.info(f"⚠️  Note: Session context forwarding to RemoteA2aAgent needs verification")
+                logger.info(f"🔍 DEBUG: RemoteA2aAgent created with agent_card: {agent_card_url}")
                 
             except Exception as e:
                 logger.error(f"Failed to create sub-agent for {agent_id}: {e}")

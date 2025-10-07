@@ -11,14 +11,14 @@ from shared.artifacts.artifact_service import create_artifact_service
 from shared.utils.custom_a2a import create_a2a_server_with_shared_session
 from a2a.types import AgentCard
 from a2aExtensions.A2AUploadMiddleware import A2AUploadMiddleware
-from shared.utils.session_service import DatabaseSessionService
+from shared.utils.session_service import AgentSessionService
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 artifact_service = create_artifact_service()
-session_service = DatabaseSessionService()
+session_service = AgentSessionService()
 # Initialize orchestrator
 orchestrator_core = OrchestratorCore()
 
@@ -55,11 +55,11 @@ app = create_a2a_server_with_shared_session(
     host="0.0.0.0",
     agent_card=agent_card,
     artifact_service=artifact_service,
-    session_service=session_service
+    session_service=session_service,
 )
 
 # Add A2A Upload middleware
-app.add_middleware(A2AUploadMiddleware(artifact_service=artifact_service))
+app.add_middleware(A2AUploadMiddleware, artifact_service=artifact_service)
 
 # Add CORS middleware to A2A app
 app.add_middleware(
