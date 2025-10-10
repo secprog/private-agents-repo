@@ -812,6 +812,7 @@ body {
 .panel-content {
     padding: 1.5rem;
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Modal */
@@ -1395,4 +1396,562 @@ body {
 
 .permission-note i {
     color: var(--primary-color);
+}
+
+/* Multi-Language Code Block Styles */
+.code-container {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    margin: 0.5rem 0;
+    overflow: hidden;
+    transition: var(--transition);
+}
+
+.code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+}
+
+.code-header:hover {
+    background: var(--bg-hover);
+}
+
+.code-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    margin-right: 12px;
+}
+
+.code-language-badge {
+    background: var(--accent-color);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: auto;
+}
+
+.code-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.code-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+    transition: var(--transition);
+}
+
+.code-toggle i {
+    transition: transform 0.2s ease;
+    font-size: 0.8rem;
+}
+
+.code-copy {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: var(--border-radius-sm);
+    transition: var(--transition);
+}
+
+.code-copy:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.code-content {
+    max-height: 500px;
+    overflow-y: auto;
+    transition: max-height 0.3s ease;
+}
+
+.code-content pre {
+    margin: 0;
+    padding: 1rem;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.code-content code {
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+/* Syntax Highlighting for all languages */
+.hljs {
+    background: transparent !important;
+    color: var(--text-primary) !important;
+}
+
+/* Python syntax highlighting */
+.language-python .hljs-keyword {
+    color: #ff7b72;
+}
+
+.language-python .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-python .hljs-number {
+    color: #79b8ff;
+}
+
+.language-python .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+.language-python .hljs-function {
+    color: #d2a8ff;
+}
+
+/* Java syntax highlighting */
+.language-java .hljs-keyword {
+    color: #ff7b72;
+}
+
+.language-java .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-java .hljs-number {
+    color: #79b8ff;
+}
+
+.language-java .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+.language-java .hljs-class {
+    color: #d2a8ff;
+}
+
+/* JavaScript syntax highlighting */
+.language-javascript .hljs-keyword {
+    color: #ff7b72;
+}
+
+.language-javascript .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-javascript .hljs-number {
+    color: #79b8ff;
+}
+
+.language-javascript .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+.language-javascript .hljs-function {
+    color: #d2a8ff;
+}
+
+/* SQL syntax highlighting */
+.language-sql .hljs-keyword {
+    color: #ff7b72;
+    text-transform: uppercase;
+}
+
+.language-sql .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-sql .hljs-number {
+    color: #79b8ff;
+}
+
+.language-sql .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+/* Bash syntax highlighting */
+.language-bash .hljs-built_in {
+    color: #ff7b72;
+}
+
+.language-bash .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-bash .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+/* XML/HTML syntax highlighting */
+.language-xml .hljs-tag {
+    color: #ff7b72;
+}
+
+.language-xml .hljs-attr {
+    color: #79b8ff;
+}
+
+.language-xml .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-xml .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+/* YAML syntax highlighting */
+.language-yaml .hljs-attr {
+    color: #79b8ff;
+}
+
+.language-yaml .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-yaml .hljs-number {
+    color: #79b8ff;
+}
+
+.language-yaml .hljs-comment {
+    color: #8b949e;
+    font-style: italic;
+}
+
+/* JSON syntax highlighting */
+.language-json .hljs-attr {
+    color: #79b8ff;
+}
+
+.language-json .hljs-string {
+    color: #a5d6ff;
+}
+
+.language-json .hljs-number {
+    color: #79b8ff;
+}
+
+.language-json .hljs-literal {
+    color: #ff7b72;
+}
+
+.language-json .hljs-punctuation {
+    color: var(--text-secondary);
+}
+
+/* Scrollbar styling for code content */
+.code-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.code-content::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+
+.code-content::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.code-content::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* Message text content styling */
+.message-text-content {
+    margin: 0.5rem 0;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.message-text-content:first-child {
+    margin-top: 0;
+}
+
+.message-text-content:last-child {
+    margin-bottom: 0;
+}
+
+/* Subagent Cards */
+.subagents-grid {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.subagent-card {
+    background: linear-gradient(135deg, var(--card-bg, #ffffff) 0%, var(--card-bg-secondary, #f8f9fa) 100%);
+    border: 1px solid var(--border-color, #e9ecef);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px var(--shadow-color, rgba(0, 0, 0, 0.08));
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: visible;
+}
+
+.subagent-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px var(--shadow-hover, rgba(0, 0, 0, 0.12));
+    border-color: var(--primary-color, #4f46e5);
+}
+
+/* Removed status indicator styles */
+
+
+.subagent-card .subagent-title {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary, #1f2937);
+    line-height: 1.2;
+}
+
+.subagent-card .subagent-description {
+    margin: 0 0 12px 0;
+    font-size: 0.875rem;
+    color: var(--text-secondary, #6b7280);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Subagent Tools Styling */
+.subagent-tools {
+    margin-top: 12px;
+}
+
+.tools-title {
+    margin: 0 0 6px 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-tertiary, #9ca3af);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tools-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.tool-tag {
+    background: var(--primary-color, #4f46e5);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.3;
+    display: inline-block;
+    max-width: 100%;
+    margin-bottom: 4px;
+}
+
+/* Removed footer styles - no status or arrow needed */
+
+.subagent-card .subagent-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, var(--primary-overlay, rgba(79, 70, 229, 0.05)) 0%, var(--primary-overlay-light, rgba(99, 102, 241, 0.05)) 100%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+}
+
+.subagent-card:hover .subagent-overlay {
+    opacity: 1;
+}
+
+/* Dark theme overrides for subagent cards */
+.theme-dark .subagent-card {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    border-color: #4b5563;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark .subagent-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.theme-dark .subagent-card .subagent-title {
+    color: #f9fafb;
+}
+
+.theme-dark .subagent-card .subagent-description {
+    color: #d1d5db;
+}
+
+.theme-dark .tools-title {
+    color: #9ca3af;
+}
+
+.theme-dark .tool-tag {
+    background: #4f46e5;
+    color: white;
+}
+
+/* Removed dark theme status styles */
+
+/* Tooltip for subagent cards */
+
+.subagent-card::after {
+    content: attr(data-description);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-primary, #1a1a1a);
+    color: var(--text-primary, #f9fafb);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: normal;
+    max-width: 300px;
+    width: max-content;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color, #404040);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.subagent-card:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Hide tooltip when hovering over tool tags */
+.subagent-card:hover .tool-tag[data-hide-tooltip="true"]:hover ~ *::after,
+.subagent-card .tool-tag[data-hide-tooltip="true"]:hover ~ *::after,
+.subagent-card .tool-tag[data-hide-tooltip="true"]:hover::after {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* Alternative approach: hide tooltip when any tool is hovered */
+.subagent-card:has(.tool-tag[data-hide-tooltip="true"]:hover)::after {
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* Dark theme tooltip */
+.theme-dark .subagent-card::after {
+    background: #1a1a1a;
+    color: #f9fafb;
+    border-color: #404040;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Tooltip for main agent cards in sidebar */
+.agent-item {
+    position: relative;
+    cursor: pointer;
+}
+
+/* Custom tooltip class for JavaScript positioning */
+.agent-tooltip {
+    position: fixed;
+    background: var(--bg-primary, #1a1a1a);
+    color: var(--text-primary, #f9fafb);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    white-space: normal;
+    max-width: 300px;
+    width: max-content;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color, #404040);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    z-index: 9999;
+    pointer-events: none;
+}
+
+.agent-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Dark theme tooltip */
+.theme-dark .agent-tooltip {
+    background: #1a1a1a;
+    color: #f9fafb;
+    border-color: #404040;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* Agent Details Panel Spacing */
+.agent-detail {
+    margin-bottom: 24px;
+}
+
+.agent-detail:last-child {
+    margin-bottom: 0;
+}
+
+.agent-detail h4 {
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.agent-detail p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.agent-detail ul {
+    margin: 0;
+    padding-left: 16px;
+}
+
+.agent-detail li {
+    margin-bottom: 4px;
 }

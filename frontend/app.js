@@ -1371,7 +1371,14 @@ class AgentPlatform {
         
         const text = document.createElement('div');
         text.className = 'message-text';
-        text.textContent = message.content;
+        
+        // Check if content contains markdown code blocks and process them
+        if (this.containsMarkdownCodeBlocks(message.content)) {
+            this.formatMarkdownContent(text, message.content);
+        } else {
+            text.textContent = message.content;
+        }
+        
         bubble.appendChild(text);
         
         // Attachments
@@ -1421,6 +1428,44 @@ class AgentPlatform {
         const date = new Date(timestamp);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
+    
+    containsMarkdownCodeBlocks(content) {
+        if (typeof content !== 'string') return false;
+        return /```[\s\S]*?```/.test(content);
+    }
+    
+    formatMarkdownContent(container, content) {
+        if (window.marked) {
+            try {
+                // Use Marked.js to process the markdown with syntax highlighting
+                const html = marked.parse(content);
+                container.innerHTML = html;
+                
+                // Add custom styling to code blocks
+                const codeBlocks = container.querySelectorAll('pre code');
+                codeBlocks.forEach(block => {
+                    const pre = block.parentElement;
+                    pre.classList.add('code-container');
+                    
+                    // Add language badge if available
+                    const language = block.className.match(/language-(\w+)/);
+                    if (language) {
+                        const badge = document.createElement('span');
+                        badge.className = 'code-language-badge';
+                        badge.textContent = language[1].toUpperCase();
+                        pre.insertBefore(badge, block);
+                    }
+                });
+            } catch (error) {
+                console.error('Error processing markdown:', error);
+                container.textContent = content;
+            }
+        } else {
+            // Fallback to plain text if Marked.js is not available
+            container.textContent = content;
+        }
+    }
+    
     
     showTypingIndicator() {
         const indicator = document.getElementById('typingIndicator');
@@ -1558,9 +1603,13 @@ class AgentPlatform {
     // Extract sub-agent information from orchestrator card
     extractSubAgents(orchestratorCard) {
         this.agents = [];
+        this.parentAgents = [];
         
         // Extract sub-agent information from skills section
         const skills = orchestratorCard.skills || [];
+        
+        // Group skills by agent ID
+        const agentGroups = {};
         
         for (const skill of skills) {
             // Skip the orchestrator's own skill (orchestration)
@@ -1568,26 +1617,144 @@ class AgentPlatform {
                 continue;
             }
             
+            // Don't skip tools - they should be included as skills of subagents
+            
             // Extract sub-agent info from skill tags
             const subAgentTag = skill.tags?.find(tag => tag.startsWith('sub_agent:'));
             if (subAgentTag) {
                 const agentId = subAgentTag.replace('sub_agent:', '');
+                console.log(`Skill "${skill.name}" belongs to agent: ${agentId}`, skill);
                 
-                this.agents.push({
-                    agent_id: agentId,
-                    status: 'online',
-                    capabilities: skill.tags || [],
-                    agent_card: {
-                        name: skill.name,
-                        description: skill.description,
-                        skills: [skill]
-                    }
-                });
+                if (!agentGroups[agentId]) {
+                    agentGroups[agentId] = [];
+                }
+                agentGroups[agentId].push(skill);
             }
         }
         
+        // First, identify which agents are actually subagents by looking at their skill names
+        const subagentAgents = new Set();
+        for (const [agentId, agentSkills] of Object.entries(agentGroups)) {
+            // If an agent's skills have names like "something: model", it's likely a subagent
+            const hasSubagentNaming = agentSkills.some(skill => 
+                skill.name.includes(':') && skill.name !== 'model'
+            );
+            if (hasSubagentNaming) {
+                subagentAgents.add(agentId);
+            }
+        }
+        
+        console.log('Detected subagent agents:', Array.from(subagentAgents));
+        
+        // Process each agent group
+        for (const [agentId, agentSkills] of Object.entries(agentGroups)) {
+            console.log(`Processing agent: ${agentId}`, agentSkills);
+            
+            // Skip if this is a subagent - we'll handle it later
+            if (subagentAgents.has(agentId)) {
+                console.log(`Skipping subagent: ${agentId}`);
+                continue;
+            }
+            
+            // Find the main skill (usually named 'model' or matches agent ID)
+            const mainSkill = agentSkills.find(skill => 
+                skill.name === 'model' || 
+                skill.name === agentId ||
+                skill.name === agentId.replace('-', '_')
+            );
+            
+            console.log(`Main skill for ${agentId}:`, mainSkill);
+            
+            if (mainSkill) {
+                // This is a parent agent - collect all subagent skills
+                const allSkills = [...agentSkills];
+                
+                // Add skills from detected subagent agents
+                for (const subagentAgentId of subagentAgents) {
+                    const subagentSkills = agentGroups[subagentAgentId] || [];
+                    console.log(`Adding subagent skills from ${subagentAgentId} to ${agentId}:`, subagentSkills);
+                    allSkills.push(...subagentSkills);
+                }
+                
+                const parentAgent = {
+                    agent_id: agentId,
+                    status: 'online',
+                    capabilities: mainSkill.tags || [],
+                    skills: allSkills,
+                    subagents: [],
+                    agent_card: {
+                        name: mainSkill.name,
+                        description: mainSkill.description,
+                        skills: [mainSkill]
+                    }
+                };
+                
+                // Group skills by subagent name to collect all tools for each subagent
+                const subagentGroups = {};
+                const subagentSkills = allSkills.filter(skill => 
+                    skill !== mainSkill && 
+                    skill.name.includes(':') && 
+                    skill.name !== 'model'
+                );
+                
+                // Group skills by subagent name
+                for (const skill of subagentSkills) {
+                    const subagentName = skill.name.split(':')[0];
+                    if (!subagentGroups[subagentName]) {
+                        subagentGroups[subagentName] = [];
+                    }
+                    subagentGroups[subagentName].push(skill);
+                }
+                
+                console.log(`Subagent groups for ${agentId}:`, subagentGroups);
+                
+                // Create subagent objects with all their skills/tools
+                for (const [subagentName, skills] of Object.entries(subagentGroups)) {
+                    // Find the main skill (usually the one with 'model' in the name)
+                    const mainSubagentSkill = skills.find(skill => 
+                        skill.name.includes(': model') || 
+                        skill.name.endsWith(': model')
+                    ) || skills[0]; // Fallback to first skill if no model found
+                    
+                    console.log(`Adding subagent: ${subagentName} with skills:`, skills);
+                    
+                    parentAgent.subagents.push({
+                        agent_id: subagentName,
+                        capabilities: mainSubagentSkill.tags || [],
+                        skills: skills, // All skills including tools
+                        agent_card: {
+                            name: mainSubagentSkill.name,
+                            description: mainSubagentSkill.description,
+                            skills: skills
+                        }
+                    });
+                }
+                
+                this.parentAgents.push(parentAgent);
+            } else {
+                // This is a standalone agent (no main skill and not a detected subagent)
+                const standaloneAgent = {
+                    agent_id: agentId,
+                    status: 'online',
+                    capabilities: agentSkills[0]?.tags || [],
+                    skills: agentSkills,
+                    agent_card: {
+                        name: agentSkills[0]?.name || agentId,
+                        description: agentSkills[0]?.description || 'Specialized agent',
+                        skills: agentSkills
+                    }
+                };
+                this.agents.push(standaloneAgent);
+            }
+        }
+        
+        // Debug logging
+        console.log('Parent agents:', this.parentAgents);
+        console.log('Standalone agents:', this.agents);
+        
         this.updateAgentsList();
-        this.showToast(`Connected to Agent Platform (${this.agents.length} sub-agents)`, 'success');
+        const totalAgents = this.parentAgents.length + this.agents.length;
+        this.showToast(`Connected to Agent Platform (${totalAgents} agents)`, 'success');
     }
     
     
@@ -1595,9 +1762,40 @@ class AgentPlatform {
         const agentsList = document.getElementById('agentsList');
         agentsList.innerHTML = '';
         
+        // Display parent agents (simple list, no expandable functionality)
+        this.parentAgents.forEach(parentAgent => {
+            const parentLi = document.createElement('li');
+            parentLi.className = 'agent-item';
+            const description = parentAgent.agent_card?.description || 'Specialized agent';
+            parentLi.innerHTML = `
+                <div class="agent-info">
+                    <div class="agent-icon" style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-color); display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; color: white; font-size: 0.875rem;">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <div class="agent-name">${parentAgent.agent_id}</div>
+                        <div class="agent-description" 
+                             style="word-wrap: break-word; white-space: normal; max-width: 200px; font-size: 0.85em; color: #666; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; ">${description}</div>
+                    </div>
+                </div>
+                <span class="status-dot ${parentAgent.status === 'online' ? 'online' : 'offline'}" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: auto; flex-shrink: 0;"></span>
+            `;
+            
+            // Add tooltip functionality
+            this.addTooltipToAgent(parentLi, description);
+            
+            parentLi.addEventListener('click', () => {
+                console.log('Parent agent clicked:', parentAgent);
+                this.showAgentDetails(parentAgent);
+            });
+            agentsList.appendChild(parentLi);
+        });
+        
+        // Display standalone agents (agents without subagents)
         this.agents.forEach(agent => {
             const li = document.createElement('li');
             li.className = 'agent-item';
+            const description = agent.agent_card?.description || 'Specialized agent';
             li.innerHTML = `
                 <div class="agent-info">
                     <div class="agent-icon" style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary-color); display: flex; align-items: center; justify-content: center; margin-right: 12px; flex-shrink: 0; color: white; font-size: 0.875rem;">
@@ -1606,20 +1804,102 @@ class AgentPlatform {
                     <div style="flex: 1; min-width: 0;">
                         <div class="agent-name">${agent.agent_id}</div>
                         <div class="agent-description" 
-                             style="word-wrap: break-word; white-space: normal; max-width: 200px; font-size: 0.85em; color: #666; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; cursor: help;" 
-                             title="${agent.agent_card?.description || 'Specialized agent'}">${agent.agent_card?.description || 'Specialized agent'}</div>
+                             style="word-wrap: break-word; white-space: normal; max-width: 200px; font-size: 0.85em; color: #666; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis; ">${description}</div>
                     </div>
                 </div>
                 <span class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-left: auto; flex-shrink: 0;"></span>
             `;
-            li.addEventListener('click', () => this.showAgentDetails(agent));
+            
+            // Add tooltip functionality
+            this.addTooltipToAgent(li, description);
+            
+            li.addEventListener('click', () => {
+                console.log('Agent clicked:', agent);
+                this.showAgentDetails(agent);
+            });
             agentsList.appendChild(li);
+        });
+    }
+    
+    addTooltipToAgent(agentElement, description) {
+        let tooltip = null;
+        
+        agentElement.addEventListener('mouseenter', (e) => {
+            // Create tooltip if it doesn't exist
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.className = 'agent-tooltip';
+                tooltip.textContent = description;
+                document.body.appendChild(tooltip);
+            }
+            
+            // Position tooltip to the right of the agent card
+            const rect = agentElement.getBoundingClientRect();
+            tooltip.style.left = (rect.right + 12) + 'px';
+            tooltip.style.top = (rect.top + rect.height / 2) + 'px';
+            tooltip.style.transform = 'translateY(-50%)';
+            
+            // Show tooltip
+            tooltip.classList.add('show');
+        });
+        
+        agentElement.addEventListener('mouseleave', () => {
+            if (tooltip) {
+                tooltip.classList.remove('show');
+            }
+        });
+        
+        // Clean up tooltip when agent element is removed
+        agentElement.addEventListener('DOMNodeRemoved', () => {
+            if (tooltip && tooltip.parentNode) {
+                tooltip.parentNode.removeChild(tooltip);
+            }
         });
     }
     
     showAgentDetails(agent) {
         const panel = document.getElementById('agentPanel');
         const details = document.getElementById('agentDetails');
+        
+        // Debug logging
+        console.log('Showing details for agent:', agent);
+        console.log('Agent subagents:', agent.subagents);
+        
+        let subagentsHtml = '';
+        if (agent.subagents && agent.subagents.length > 0) {
+            subagentsHtml = `
+                <div class="agent-detail">
+                    <h4><i class="fas fa-sitemap" style="margin-right: 8px; color: var(--primary-color);"></i>Sub-agents (${agent.subagents.length})</h4>
+                    <div class="subagents-grid">
+                        ${agent.subagents.map(subagent => `
+                            <div class="subagent-card" data-description="${subagent.agent_card?.description || 'Specialized sub-agent'}">
+                                <h5 class="subagent-title">${subagent.agent_id}</h5>
+                                
+                                <p class="subagent-description">${subagent.agent_card?.description || 'Specialized sub-agent'}</p>
+                                
+                                ${subagent.skills && subagent.skills.filter(skill => !skill.name.includes(': model')).length > 0 ? `
+                                    <div class="subagent-tools">
+                                        <h6 class="tools-title">Tools:</h6>
+                                        <div class="tools-list">
+                                            ${subagent.skills
+                                                .filter(skill => !skill.name.includes(': model'))
+                                                .map(skill => {
+                                                    // Extract just the tool name (part after the colon)
+                                                    const toolName = skill.name.includes(':') ? skill.name.split(':')[1].trim() : skill.name;
+                                                    const toolDescription = skill.description || '';
+                                                    return `<span class="tool-tag" data-hide-tooltip="true">${toolName}: ${toolDescription}</span>`;
+                                                }).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                <div class="subagent-overlay"></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
         
         details.innerHTML = `
             <div class="agent-detail">
@@ -1631,16 +1911,17 @@ class AgentPlatform {
                 <p style="word-wrap: break-word; white-space: normal; max-width: 100%; line-height: 1.4; font-size: 0.9em; color: #666;">${agent.agent_card?.description || 'Specialized agent'}</p>
             </div>
             <div class="agent-detail">
-                <h4>Status</h4>
-                <p><span class="status-dot ${agent.status === 'online' ? 'online' : 'offline'}" style="width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span> ${agent.status}</p>
-            </div>
-            <div class="agent-detail">
                 <h4>Capabilities</h4>
                 <ul>
-                    ${(agent.capabilities || []).map(cap => `<li>${cap}</li>`).join('')}
+                    ${(agent.capabilities || [])
+                        .filter(cap => !cap.includes(`sub_agent:${agent.agent_id}`))
+                        .map(cap => `<li>${cap}</li>`).join('')}
                 </ul>
             </div>
+            ${subagentsHtml}
         `;
+        
+        // No click handlers needed for subagent cards
         
         panel.style.display = 'flex';
     }
@@ -2518,4 +2799,13 @@ const app = new AgentPlatform();
 
 // Make app globally available for inline event handlers
 window.app = app;
+
+// Add click event to sidebar header to reload page
+const sidebarHeader = document.querySelector('.sidebar-header');
+if (sidebarHeader) {
+    sidebarHeader.addEventListener('click', () => {
+        window.location.reload();
+    });
+    sidebarHeader.style.cursor = 'pointer';
+}
 });

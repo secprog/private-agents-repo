@@ -27,8 +27,16 @@ architecture_sub_agent = Agent(
     name="architecture_analyzer",
     description="Specialized sub-agent for analyzing system architecture diagrams",
     model="gemini-2.0-flash",
-    instruction="Analyze architecture diagrams and extract components, connections, technologies, and security domains",
-    tools=[architecture_analyzer.analyze_architecture, architecture_analyzer.generate_security_report]
+    instruction="Analyze architecture diagrams and extract components, connections, technologies, and security domains, outputs in json format",
+    tools=[architecture_analyzer.analyze_architecture]
+)
+
+cybersecurity_architect_sub_agent = Agent(
+    name="cybersecurity_architect",
+    description="Specialized sub-agent for analyzing system architecture diagrams and provide cybersecurity recommendations and risk assessments",
+    model="gemini-2.0-flash",
+    instruction="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments outputs in json format",
+    tools=[architecture_analyzer.security_analysis]
 )
 
 # Create A2A server using ADK SDK directly
@@ -37,7 +45,7 @@ root_agent = Agent(
     description="Specialized agent for cybersecurity.",
     model="gemini-2.0-flash",
     instruction="For cybersecurity tasks, you delegate to the most appropriate sub-agent.",
-    sub_agents=[architecture_sub_agent],
+    sub_agents=[architecture_sub_agent, cybersecurity_architect_sub_agent],
 )
 
 app = create_a2a_server_with_shared_session(

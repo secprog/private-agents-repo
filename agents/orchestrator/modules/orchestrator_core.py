@@ -117,7 +117,7 @@ class OrchestratorCore:
             if self.agent_registry:
                 instruction = (
                     "You are a dispatcher orchestrator. Analyze the user's request and TRANSFER to the most appropriate sub-agent." + "\n" +
-                    "Always TRANSFER to a sub-agent rather than handling requests directly."
+                    "Always TRANSFER to a sub-agent rather than handling requests directly. Do not touch on the sub-agent's response, just transfer it to the user."
                 )
             else:
                 instruction = "Do nothing just say: No specialized sub-agents are currently available."
