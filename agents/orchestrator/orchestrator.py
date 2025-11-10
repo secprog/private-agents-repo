@@ -7,7 +7,7 @@ import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
 from modules.orchestrator_core import OrchestratorCore
-from shared.artifacts.artifact_service import create_artifact_service
+from google.adk.artifacts import FileArtifactService
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.runners import Runner
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
@@ -22,7 +22,7 @@ from shared.utils.session_service import AgentSessionService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-artifact_service = create_artifact_service()
+artifact_service = FileArtifactService(root_dir="./my_artifacts")
 session_service = AgentSessionService()
 # Initialize orchestrator
 orchestrator_core = OrchestratorCore()

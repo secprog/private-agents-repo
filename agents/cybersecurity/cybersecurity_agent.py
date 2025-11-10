@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
-from shared.artifacts.artifact_service import create_artifact_service
+from google.adk.artifacts import FileArtifactService
 from shared.utils.session_service import AgentSessionService
 from modules.architecture_analysis import ArchitectureAnalyzer
 # Initialize logging
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
-artifact_service = create_artifact_service()
+artifact_service = FileArtifactService(root_dir="./my_artifacts")
 session_service = AgentSessionService()
 
 architecture_analyzer = ArchitectureAnalyzer(artifact_service=artifact_service)

@@ -13,7 +13,7 @@ from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.auth.credential_service.in_memory_credential_service import (
     InMemoryCredentialService,
 )
-from shared.artifacts.artifact_service import create_artifact_service
+from google.adk.artifacts import FileArtifactService
 from shared.utils.session_service import AgentSessionService
 
 # Initialize logging
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
-artifact_service = create_artifact_service()
+artifact_service = FileArtifactService(root_dir="./my_artifacts")
 session_service = AgentSessionService()
 
 
