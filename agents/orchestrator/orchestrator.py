@@ -8,7 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from modules.orchestrator_core import OrchestratorCore
 from shared.artifacts.artifact_service import create_artifact_service
-from shared.utils.custom_a2a import create_a2a_server_with_shared_session
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from google.adk.runners import Runner
+from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+from google.adk.auth.credential_service.in_memory_credential_service import (
+    InMemoryCredentialService,
+)
 from a2a.types import AgentCard
 from a2aExtensions.A2AUploadMiddleware import A2AUploadMiddleware
 from shared.utils.session_service import AgentSessionService
@@ -49,13 +54,19 @@ agent_card = AgentCard(
     supportsAuthenticatedExtendedCard=False,
     preferred_transport="JSONRPC",
 )
-app = create_a2a_server_with_shared_session(
+app = to_a2a(
     root_agent,
     port=8000,
     host="0.0.0.0",
     agent_card=agent_card,
-    artifact_service=artifact_service,
-    session_service=session_service,
+    runner=Runner(
+        app_name=orchestrator_core.agent_id,
+        agent=root_agent,
+        artifact_service=artifact_service,
+        session_service=session_service,
+        memory_service=InMemoryMemoryService(),
+        credential_service=InMemoryCredentialService(),
+    ),
 )
 
 # Add A2A Upload middleware
