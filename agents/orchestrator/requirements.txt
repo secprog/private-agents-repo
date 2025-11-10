@@ -1,9 +1,9 @@
 # Google ADK SDK - Core packages
-google-adk>=1.15.1
-google-adk[llm]>=1.15.1
-google-adk[a2a]>=1.15.1
+google-adk>=1.18.0
+a2a-sdk[all]>=0.3.11
+google-adk[llm]>=1.18.0
+google-adk[a2a]>=1.18.0
 google-genai>=1.0.0
-a2a-sdk[all]>=0.3.7
 
 # Web Framework
 fastapi>=0.110.0
