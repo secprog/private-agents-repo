@@ -327,7 +327,6 @@ body {
     gap: 0.75rem;
     padding: 0.75rem;
     border-radius: var(--border-radius-sm);
-    cursor: pointer;
     transition: var(--transition);
 }
 
@@ -344,6 +343,31 @@ body {
 .user-name {
     font-size: 0.9rem;
     font-weight: 500;
+    flex: 1;
+}
+
+.btn-logout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    border-radius: var(--border-radius-sm);
+    color: var(--text-tertiary);
+    opacity: 0.4;
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 0.875rem;
+}
+
+.btn-logout:hover {
+    opacity: 1;
+    background: var(--error-color);
+    color: white;
 }
 
 /* Main Content */

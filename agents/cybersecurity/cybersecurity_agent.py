@@ -36,7 +36,7 @@ architecture_sub_agent = Agent(
 
 cybersecurity_architect_sub_agent = Agent(
     name="cybersecurity_architect",
-    description="Specialized sub-agent for analyzing system architecture diagrams and provide cybersecurity recommendations and risk assessments",
+    description="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments",
     model="gemini-2.0-flash",
     instruction="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments outputs in json format",
     tools=[architecture_analyzer.security_analysis]

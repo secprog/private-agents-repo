@@ -112,8 +112,8 @@ yarn-error.log*
 *.sqlite3
 
 # Uploads
-uploads/
-/tmp/uploads/
+artifacts/
+/tmp/artifacts/
 
 # Agent Platform specific
 agent_platform_data/

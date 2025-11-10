@@ -3,7 +3,6 @@ Advanced Architecture Analysis using AI Vision and Multi-modal Processing
 """
 
 import logging
-import base64
 import json
 
 from typing import Dict, Any
@@ -11,11 +10,12 @@ from typing import Dict, Any
 from google.genai.types import Part, Blob
 
 logger = logging.getLogger(__name__)
+APP_NAME = "orquestrator"
 
 class ArchitectureAnalyzer:
     """Advanced architecture analyzer using AI vision and multi-modal processing"""
     
-    def __init__(self, artifact_service=None):        
+    def __init__(self, artifact_service):        
         # Store the artifact service for loading files
         self.artifact_service = artifact_service
         logger.info(f"ArchitectureAnalyzer initialized with artifact service: {type(artifact_service)}")
@@ -114,28 +114,27 @@ Provide actionable security recommendations and risk assessments.
         security_analysis = await self._perform_security_analysis(part, visual_analysis)
         return json.dumps(security_analysis)
 
-
-    async def analyze_architecture(self, session_id: str, filename: str) -> str:
+    async def analyze_architecture(self, user_id:str, session_id: str, filename: str) -> str:
         """Comprehensive architecture analysis using AI vision and security expertise"""
         try:
             logger.info(f"Starting architecture analysis for session_id={session_id}, filename={filename}")
             
-            artifact_data = await self.artifact_service.load_artifact_to_data(filename, session_id)
-            
-            if not artifact_data:
-                logger.error(f"Could not load artifact: {filename} from session {session_id}")
-                raise ValueError(f"Could not load artifact: {filename}")
-            
-            logger.info(f"Successfully loaded artifact: {filename} (type: {artifact_data.mime_type})")
-            
-            # Create Part object for the LLM
-            binary_data = base64.b64decode(artifact_data.data)
-            part = Part(
-                inline_data=Blob(
-                    mime_type=artifact_data.mime_type,
-                    data=binary_data
-                )
+            # Load artifact using artifact_service directly
+            logger.info(f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}")
+            part = await self.artifact_service.load_artifact(
+                app_name=APP_NAME,
+                user_id=user_id,
+                session_id=session_id,
+                filename=filename,
+                version=None,
             )
+            
+            if not part or not part.inline_data:
+                logger.error(f"Could not load artifact")
+                logger.error(f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}")
+                raise ValueError(f"Could not load artifact: {filename} from session {session_id}")
+            
+            logger.info(f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})")
             
             visual_analysis = await self._perform_visual_analysis(part, filename)
             return json.dumps(visual_analysis)

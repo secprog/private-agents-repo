@@ -164,7 +164,6 @@ class AgentPlatform {
             set: function (value) {
                 if (originalSessionId !== value) {
                     console.log('🔄 sessionId changed from', originalSessionId, 'to', value);
-                    console.trace('SessionId change stack trace:');
                 }
                 originalSessionId = value;
             }
@@ -184,6 +183,7 @@ class AgentPlatform {
     init() {
         this.setupEventListeners();
         this.loadSessions();
+        this.updateUserDisplay();
 
         // Initialize input controls as disabled until agent status is determined
         this.updateInputControlsState(false);
@@ -398,15 +398,85 @@ class AgentPlatform {
         return userId;
     }
 
-    clearUserSession() {
-        // Clear user session (useful for logout or testing)
-        localStorage.removeItem('userSessionId');
+    updateUserDisplay() {
+        const userNameElement = document.getElementById('userNameDisplay');
+        if (userNameElement && this.userId) {
+            userNameElement.textContent = this.userId;
+        }
+    }
+
+    getWelcomeMessageHTML() {
+        return `
+            <div class="welcome-message" id="welcomeMessage">
+                <div class="welcome-icon">
+                    <i class="fas fa-comments"></i>
+                </div>
+                <h2>Welcome to Agent Platform</h2>
+                <p>Start a conversation with our AI agents. They can help with:</p>
+                <div class="capability-cards">
+                    <div class="capability-card">
+                        <i class="fas fa-shield-alt"></i>
+                        <h4>Cybersecurity</h4>
+                        <p>Security analysis, threat detection</p>
+                    </div>
+                    <div class="capability-card">
+                        <i class="fas fa-server"></i>
+                        <h4>DevOps</h4>
+                        <p>Deployment, CI/CD, Infrastructure</p>
+                    </div>
+                    <div class="capability-card">
+                        <i class="fas fa-database"></i>
+                        <h4>Data</h4>
+                        <p>Analysis, ETL, Reporting</p>
+                    </div>
+                    <div class="capability-card">
+                        <i class="fas fa-brain"></i>
+                        <h4>Machine Learning</h4>
+                        <p>Model training, Predictions</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    logout() {
+        // Show confirmation dialog
+        this.showConfirmModal(
+            'Logout',
+            'Are you sure you want to logout? This will clear all your sessions and generate a new user ID.',
+            () => {
+                this.performLogout();
+            }
+        );
+    }
+
+    performLogout() {
+        // Clear all user data
+        localStorage.removeItem('userId');
         localStorage.removeItem('sessionData');
-        this.sessionId = this.generateSessionId();
+        localStorage.removeItem('userSessionId');
+
+        // Generate new user ID
+        this.userId = this.generateUserId();
+
+        // Clear sessions
         this.sessions = [];
+        this.sessionId = this.generateSessionId();
+
+        // Update UI
+        this.updateUserDisplay();
         this.updateSessionsList();
-        this.createNewChat();
-        this.showToast('User session cleared', 'info');
+
+        // Clear chat and recreate welcome message
+        const chatMessages = document.getElementById('chatMessages');
+        if (chatMessages) {
+            chatMessages.innerHTML = this.getWelcomeMessageHTML();
+        }
+
+        // Update chat title
+        document.getElementById('chatTitle').textContent = 'New Session';
+
+        this.showToast('Logged out successfully. New user ID generated.', 'success');
     }
 
     setupEventListeners() {
@@ -497,6 +567,7 @@ class AgentPlatform {
 
         // Agent panel
         document.getElementById('closePanelBtn').addEventListener('click', () => this.hideAgentPanel());
+        document.getElementById('logoutBtn').addEventListener('click', () => this.logout());
     }
 
     autoResizeTextarea(textarea) {
@@ -2405,43 +2476,7 @@ class AgentPlatform {
             // Clear the chat area and recreate welcome message
             const chatMessages = document.getElementById('chatMessages');
             if (chatMessages) {
-                // Clear all content
-                chatMessages.innerHTML = '';
-
-                // Recreate the welcome message
-                const welcomeHTML = `
-                    <div class="welcome-message" id="welcomeMessage">
-                        <div class="welcome-icon">
-                            <i class="fas fa-comments"></i>
-                        </div>
-                        <h2>Welcome to Agent Platform</h2>
-                        <p>Start a session with our AI agents. They can help with:</p>
-                        <div class="capability-cards">
-                            <div class="capability-card">
-                                <i class="fas fa-shield-alt"></i>
-                                <h4>Cybersecurity</h4>
-                                <p>Security analysis, threat detection</p>
-                            </div>
-                            <div class="capability-card">
-                                <i class="fas fa-server"></i>
-                                <h4>DevOps</h4>
-                                <p>Deployment, CI/CD, Infrastructure</p>
-                            </div>
-                            <div class="capability-card">
-                                <i class="fas fa-database"></i>
-                                <h4>Data</h4>
-                                <p>Analysis, ETL, Reporting</p>
-                            </div>
-                            <div class="capability-card">
-                                <i class="fas fa-brain"></i>
-                                <h4>Machine Learning</h4>
-                                <p>Model training, Predictions</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                chatMessages.innerHTML = welcomeHTML;
+                chatMessages.innerHTML = this.getWelcomeMessageHTML();
                 console.log('Recreated welcome message after single session deletion');
             } else {
                 console.warn('chatMessages element not found after single session deletion');
@@ -2497,43 +2532,7 @@ class AgentPlatform {
         // Clear the chat area and recreate welcome message
         const chatMessages = document.getElementById('chatMessages');
         if (chatMessages) {
-            // Clear all content
-            chatMessages.innerHTML = '';
-
-            // Recreate the welcome message
-            const welcomeHTML = `
-                <div class="welcome-message" id="welcomeMessage">
-                    <div class="welcome-icon">
-                        <i class="fas fa-comments"></i>
-                    </div>
-                    <h2>Welcome to Agent Platform</h2>
-                    <p>Start a session with our AI agents. They can help with:</p>
-                    <div class="capability-cards">
-                        <div class="capability-card">
-                            <i class="fas fa-shield-alt"></i>
-                            <h4>Cybersecurity</h4>
-                            <p>Security analysis, threat detection</p>
-                        </div>
-                        <div class="capability-card">
-                            <i class="fas fa-server"></i>
-                            <h4>DevOps</h4>
-                            <p>Deployment, CI/CD, Infrastructure</p>
-                        </div>
-                        <div class="capability-card">
-                            <i class="fas fa-database"></i>
-                            <h4>Data</h4>
-                            <p>Analysis, ETL, Reporting</p>
-                        </div>
-                        <div class="capability-card">
-                            <i class="fas fa-brain"></i>
-                            <h4>Machine Learning</h4>
-                            <p>Model training, Predictions</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            chatMessages.innerHTML = welcomeHTML;
+            chatMessages.innerHTML = this.getWelcomeMessageHTML();
             console.log('Recreated welcome message after clear all');
         } else {
             console.warn('chatMessages element not found after clear all');
