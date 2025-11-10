@@ -1,5 +1,5 @@
 # Google ADK SDK - Core packages
-google-adk>=1.18.0
+google-adk @ git+https://github.com/google/adk-python@main
 a2a-sdk[all]>=0.3.11
 google-adk[llm]>=1.18.0
 google-adk[a2a]>=1.18.0
