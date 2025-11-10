@@ -1,7 +1,7 @@
 """
 Cybersecurity Agent - Main entry point using ADK SDK
 """
-
+import os
 import logging
 from google.adk.auth.credential_service.in_memory_credential_service import InMemoryCredentialService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
-artifact_service = FileArtifactService(root_dir="./my_artifacts")
+artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
 session_service = AgentSessionService()
 
 architecture_analyzer = ArchitectureAnalyzer(artifact_service=artifact_service)

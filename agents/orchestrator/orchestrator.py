@@ -3,6 +3,7 @@ Orchestrator Agent - Main entry point using ADK SDK
 """
 
 import logging
+import os
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,7 +23,7 @@ from shared.utils.session_service import AgentSessionService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-artifact_service = FileArtifactService(root_dir="./my_artifacts")
+artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
 session_service = AgentSessionService()
 # Initialize orchestrator
 orchestrator_core = OrchestratorCore()

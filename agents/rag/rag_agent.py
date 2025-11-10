@@ -3,6 +3,7 @@ Cybersecurity Agent - Main entry point using ADK SDK
 """
 
 import logging
+import os
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
-artifact_service = FileArtifactService(root_dir="./my_artifacts")
+artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
 session_service = AgentSessionService()
 
 
