@@ -1,5 +1,6 @@
 import base64, hashlib, uuid, time
 import logging
+from google.adk.artifacts import BaseArtifactService
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
@@ -7,8 +8,6 @@ from starlette.requests import Request
 from pydantic import BaseModel
 from typing import Optional
 
-# Import our artifact service and models
-from shared.artifacts.artifact_service import ArtifactServiceWrapper, create_artifact_service
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +25,7 @@ class A2AUploadMiddleware(BaseHTTPMiddleware):
     """
     A2A Upload Middleware for handling file uploads via the A2A protocol.
     
-    This middleware integrates with the ArtifactServiceWrapper to save uploaded files
+    This middleware integrates with the BaseArtifactService to save uploaded files
     using the ADK Artifact Service. It supports both session-scoped and user-scoped
     artifacts with proper namespace handling.
     
@@ -45,10 +44,10 @@ class A2AUploadMiddleware(BaseHTTPMiddleware):
         "abort": "artifactUpload/abort",
     }
     
-    def __init__(self, app, artifact_service: ArtifactServiceWrapper = None):
+    def __init__(self, app, artifact_service: BaseArtifactService):
         super().__init__(app)
         logger.info("Initializing A2AUploadMiddleware")
-        self.artifact_service = artifact_service or create_artifact_service()
+        self.artifact_service = artifact_service
         logger.info(f"Artifact service initialized: {type(self.artifact_service)}")
         logger.info(f"Artifact service details: {self.artifact_service.__dict__}")
     

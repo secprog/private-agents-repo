@@ -6,13 +6,13 @@ import logging
 from google.adk.auth.credential_service.in_memory_credential_service import InMemoryCredentialService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
+from google.adk.sessions.database_session_service import DatabaseSessionService
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.artifacts import FileArtifactService
-from shared.utils.session_service import AgentSessionService
 from modules.architecture_analysis import ArchitectureAnalyzer
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
 artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
-session_service = AgentSessionService()
+session_service = DatabaseSessionService(db_url=os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform"))
 
 architecture_analyzer = ArchitectureAnalyzer(artifact_service=artifact_service)
 

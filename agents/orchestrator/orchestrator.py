@@ -4,6 +4,7 @@ Orchestrator Agent - Main entry point using ADK SDK
 
 import logging
 import os
+from google.adk.sessions.database_session_service import DatabaseSessionService
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,14 +18,13 @@ from google.adk.auth.credential_service.in_memory_credential_service import (
 )
 from a2a.types import AgentCard
 from a2aExtensions.A2AUploadMiddleware import A2AUploadMiddleware
-from shared.utils.session_service import AgentSessionService
 
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
-session_service = AgentSessionService()
+session_service = DatabaseSessionService(db_url=os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform"))
 # Initialize orchestrator
 orchestrator_core = OrchestratorCore()
 
