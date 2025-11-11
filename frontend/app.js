@@ -173,6 +173,7 @@ class AgentPlatform {
         this.agents = [];
         this.attachments = [];
         this.isTyping = false;
+        this.toolCallMessages = new Map(); // Track tool calls by ID to match requests and responses
 
         // Initialize A2A upload service
         this.uploadService = new A2AUploadService(this.apiEndpoint);
@@ -1237,6 +1238,34 @@ class AgentPlatform {
                                         timestamp: taskStatus.timestamp || new Date().toISOString(),
                                         agent: this.currentAgentName
                                     }, true, capturedSessionId);
+                                } else if (part.kind === "data" && part.data) {
+                                    // Check if this is artifactRef - handle as attachment
+                                    if (part.data.artifactRef) {
+                                        const artifactRef = part.data.artifactRef;
+                                        this.addMessageToChat({
+                                            id: artifact.artifactId || this.generateMessageId(),
+                                            type: 'agent',
+                                            content: '', // No text content for artifact-only messages
+                                            attachments: [{
+                                                name: artifactRef.filename || 'Attachment',
+                                                filename: artifactRef.filename,
+                                                type: artifactRef.mime || 'application/octet-stream',
+                                                uploaded: true
+                                            }],
+                                            timestamp: taskStatus.timestamp || new Date().toISOString(),
+                                            agent: this.currentAgentName
+                                        }, true, capturedSessionId);
+                                    } else if (this.isToolCallData(part.data)) {
+                                        // Handle tool call data - format as JSON string for detection
+                                        const toolCallContent = JSON.stringify(part.data);
+                                        this.addMessageToChat({
+                                            id: part.data.id || artifact.artifactId || this.generateMessageId(),
+                                            type: 'agent',
+                                            content: toolCallContent,
+                                            timestamp: taskStatus.timestamp || new Date().toISOString(),
+                                            agent: this.currentAgentName
+                                        }, true, capturedSessionId);
+                                    }
                                 }
                             });
                         }
@@ -1253,10 +1282,13 @@ class AgentPlatform {
                 // Handle history-based response (fallback)
                 const latestMessage = result.history[result.history.length - 1];
                 if (latestMessage && latestMessage.kind === "message") {
+                    // Extract artifactRef attachments
+                    const attachments = this.extractArtifactRefs(latestMessage);
                     this.addMessageToChat({
                         id: latestMessage.messageId || this.generateMessageId(),
                         type: latestMessage.role === 'user' ? 'user' : 'agent',
                         content: this.formatA2AMessage(latestMessage),
+                        attachments: attachments.length > 0 ? attachments : undefined,
                         timestamp: new Date().toISOString(),
                         agent: latestMessage.role === 'agent' ? this.currentAgentName : null
                     }, true, capturedSessionId);
@@ -1289,11 +1321,50 @@ class AgentPlatform {
             } else if (part.kind === 'artifact') {
                 content += `\n📎 Artifact: ${part.artifact?.filename || 'Unknown file'}`;
             } else if (part.kind === 'data') {
-                content += `\n📊 Data: ${JSON.stringify(part.data, null, 2)}`;
+                // Check if this is a tool call - if so, format it as JSON for detection
+                if (this.isToolCallData(part.data)) {
+                    // Return just the JSON so extractToolCallFromContent can detect it
+                    content += JSON.stringify(part.data);
+                } else if (part.data && part.data.artifactRef) {
+                    // artifactRef will be handled as attachment, don't add to content
+                    // This will be extracted separately
+                } else {
+                    content += `\n📊 Data: ${JSON.stringify(part.data, null, 2)}`;
+                }
             }
         });
 
-        return content || 'No content available';
+        return content || '';
+    }
+
+    // Extract artifactRef attachments from A2A message
+    extractArtifactRefs(message) {
+        if (!message || !message.parts) {
+            return [];
+        }
+
+        const attachments = [];
+        message.parts.forEach(part => {
+            if (part.kind === 'data' && part.data && part.data.artifactRef) {
+                const artifactRef = part.data.artifactRef;
+                attachments.push({
+                    name: artifactRef.filename || 'Attachment',
+                    filename: artifactRef.filename,
+                    type: artifactRef.mime || 'application/octet-stream',
+                    uploaded: true // Already uploaded since it's a reference
+                });
+            }
+        });
+
+        return attachments;
+    }
+
+    // Check if data object represents a tool call
+    isToolCallData(data) {
+        if (!data || typeof data !== 'object') return false;
+        // Tool calls have 'name' and 'args' fields, or 'id' and 'name' fields
+        return (data.name && (data.args !== undefined || data.id !== undefined)) ||
+               (data.id && data.name);
     }
 
     // Handle task completion
@@ -1303,10 +1374,12 @@ class AgentPlatform {
 
         // Add completion message to chat if there's a status message
         if (task.status && task.status.message) {
+            const attachments = this.extractArtifactRefs(task.status.message);
             this.addMessageToChat({
                 id: task.status.message.messageId || this.generateMessageId(),
                 type: 'agent',
                 content: `✅ **Task Completed**\n\n${this.formatA2AMessage(task.status.message)}`,
+                attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
                 agent: this.currentAgentName
             }, true, sessionId);
@@ -1320,10 +1393,12 @@ class AgentPlatform {
 
         // Add error message to chat
         if (task.status.message) {
+            const attachments = this.extractArtifactRefs(task.status.message);
             this.addMessageToChat({
                 id: task.status.message.messageId || this.generateMessageId(),
                 type: 'agent',
                 content: `❌ **Task Failed**\n\n${this.formatA2AMessage(task.status.message)}`,
+                attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
                 agent: this.currentAgentName
             }, true, sessionId);
@@ -1337,10 +1412,12 @@ class AgentPlatform {
 
         // Add running status message to chat if there's a status message
         if (task.status && task.status.message) {
+            const attachments = this.extractArtifactRefs(task.status.message);
             this.addMessageToChat({
                 id: task.status.message.messageId || this.generateMessageId(),
                 type: 'agent',
                 content: `🔄 **Task Running**\n\n${this.formatA2AMessage(task.status.message)}`,
+                attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
                 agent: this.currentAgentName
             }, true, sessionId);
@@ -1354,10 +1431,12 @@ class AgentPlatform {
 
         // Add waiting status message to chat if there's a status message
         if (task.status && task.status.message) {
+            const attachments = this.extractArtifactRefs(task.status.message);
             this.addMessageToChat({
                 id: task.status.message.messageId || this.generateMessageId(),
                 type: 'agent',
                 content: `⏳ **Task Waiting**\n\n${this.formatA2AMessage(task.status.message)}`,
+                attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
                 agent: this.currentAgentName
             }, true, sessionId);
@@ -1415,14 +1494,19 @@ class AgentPlatform {
         }
 
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${message.type}`;
+        const isToolCall = this.extractToolCallFromContent(message.content) !== null;
+        messageDiv.className = `message ${message.type}${isToolCall ? ' tool-call-message' : ''}`;
 
         // Avatar
         const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.innerHTML = message.type === 'user' ?
-            '<i class="fas fa-user"></i>' :
-            '<i class="fas fa-robot"></i>';
+        avatar.className = `message-avatar${isToolCall ? ' tool-call-avatar' : ''}`;
+        if (isToolCall) {
+            avatar.innerHTML = '<i class="fas fa-cog"></i>';
+        } else {
+            avatar.innerHTML = message.type === 'user' ?
+                '<i class="fas fa-user"></i>' :
+                '<i class="fas fa-robot"></i>';
+        }
 
         // Content
         const contentDiv = document.createElement('div');
@@ -1432,7 +1516,7 @@ class AgentPlatform {
         const header = document.createElement('div');
         header.className = 'message-header';
         header.innerHTML = `
-            <span class="message-author">${message.type === 'user' ? 'You' : 'Agent'}</span>
+            <span class="message-author">${isToolCall ? 'Tool Call' : (message.type === 'user' ? 'You' : 'Agent')}</span>
             <span class="message-time">${this.formatTime(message.timestamp)}</span>
         `;
 
@@ -1440,17 +1524,43 @@ class AgentPlatform {
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
 
-        const text = document.createElement('div');
-        text.className = 'message-text';
-
-        // Check if content contains markdown code blocks and process them
-        if (this.containsMarkdownCodeBlocks(message.content)) {
-            this.formatMarkdownContent(text, message.content);
+        // Check if this message contains tool call data
+        const toolCallData = this.extractToolCallFromContent(message.content);
+        
+        if (toolCallData) {
+            const toolCallId = toolCallData.id;
+            
+            // Check if we already have a tool call with this ID
+            if (toolCallId && this.toolCallMessages.has(toolCallId)) {
+                // Update existing tool call card with response
+                const existingCard = this.toolCallMessages.get(toolCallId);
+                this.updateToolCallCard(existingCard, toolCallData);
+                // Don't create a new message, just update the existing one
+                return;
+            } else {
+                // Create new tool call card
+                const toolCallCard = this.createToolCallCard(toolCallData);
+                bubble.appendChild(toolCallCard);
+                // Store reference to update later if response comes in
+                if (toolCallId) {
+                    this.toolCallMessages.set(toolCallId, toolCallCard);
+                    // Store message div reference for potential removal/update
+                    messageDiv.setAttribute('data-tool-call-id', toolCallId);
+                }
+            }
         } else {
-            text.textContent = message.content;
-        }
+            const text = document.createElement('div');
+            text.className = 'message-text';
 
-        bubble.appendChild(text);
+            // Check if content contains markdown code blocks and process them
+            if (this.containsMarkdownCodeBlocks(message.content)) {
+                this.formatMarkdownContent(text, message.content);
+            } else {
+                text.textContent = message.content;
+            }
+
+            bubble.appendChild(text);
+        }
 
         // Attachments
         if (message.attachments && message.attachments.length > 0) {
@@ -1498,6 +1608,176 @@ class AgentPlatform {
     formatTime(timestamp) {
         const date = new Date(timestamp);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Extract tool call data from message content
+    extractToolCallFromContent(content) {
+        if (!content || typeof content !== 'string') return null;
+        
+        // Try to parse JSON from content that might contain tool call data
+        try {
+            let jsonStr = content.trim();
+            
+            // Check if content starts with "📊 Data: " or contains JSON
+            if (content.includes('📊 Data:')) {
+                jsonStr = content.split('📊 Data:')[1].trim();
+            } else if (!jsonStr.startsWith('{')) {
+                // Try to find JSON object in the content
+                const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    jsonStr = jsonMatch[0];
+                } else {
+                    return null;
+                }
+            }
+            
+            const data = JSON.parse(jsonStr);
+            // Check if it looks like a tool call (has name and args/id)
+            if (this.isToolCallData(data)) {
+                return data;
+            }
+        } catch (e) {
+            // Not JSON or not a tool call
+        }
+        
+        return null;
+    }
+
+    // Create tool call card element
+    createToolCallCard(toolCall) {
+        const card = document.createElement('div');
+        card.className = 'tool-call-card';
+
+        const toolName = toolCall.name || 'Unknown Tool';
+        const toolId = toolCall.id || 'N/A';
+        const toolArgs = toolCall.args || {};
+        const toolResponse = toolCall.response;
+
+        // Special handling for transfer_to_agent
+        if (toolName === 'transfer_to_agent' && toolArgs.agent_name) {
+            // Simplified card for agent transfers
+            const formattedAgentName = this.formatAgentName(toolArgs.agent_name);
+            const header = document.createElement('div');
+            header.className = 'tool-call-header tool-call-header-no-border';
+            header.innerHTML = `
+                <div class="tool-call-name">
+                    <i class="fas fa-exchange-alt"></i>
+                    <span>Transferring to Agent</span>
+                </div>
+                <div class="tool-call-simple-content" style="display: inline-flex; align-items: center; gap: 0.75rem; margin-left: 1rem;">
+                    <i class="fas fa-robot"></i>
+                    <span class="agent-name">${formattedAgentName}</span>
+                </div>
+            `;
+
+            card.appendChild(header);
+            // No response section for transfer_to_agent (always null)
+            return card;
+        }
+
+        // Standard tool call card for other tools
+        // Tool header
+        const header = document.createElement('div');
+        header.className = 'tool-call-header';
+        header.innerHTML = `
+            <div class="tool-call-name">
+                <i class="fas fa-wrench"></i>
+                <span>${this.formatToolName(toolName)}</span>
+            </div>
+            <div class="tool-call-id">ID: ${toolId}</div>
+        `;
+
+        // Arguments section
+        const argsSection = document.createElement('div');
+        argsSection.className = 'tool-call-section';
+        argsSection.innerHTML = `
+            <div class="tool-call-label">Arguments:</div>
+            <div class="tool-call-content">
+                <pre>${JSON.stringify(toolArgs, null, 2)}</pre>
+            </div>
+        `;
+
+        card.appendChild(header);
+        card.appendChild(argsSection);
+
+        // Response section (only show if response is not null and not a transfer_to_agent)
+        if (toolResponse !== null && toolResponse !== undefined) {
+            const responseSection = document.createElement('div');
+            responseSection.className = 'tool-call-section tool-call-response';
+            responseSection.innerHTML = `
+                <div class="tool-call-label">Response:</div>
+                <div class="tool-call-content">
+                    <pre>${JSON.stringify(toolResponse, null, 2)}</pre>
+                </div>
+            `;
+            card.appendChild(responseSection);
+        } else if (toolName !== 'transfer_to_agent') {
+            // Only show pending for non-transfer tools
+            const pendingSection = document.createElement('div');
+            pendingSection.className = 'tool-call-section tool-call-pending';
+            pendingSection.innerHTML = `
+                <div class="tool-call-label">Status:</div>
+                <div class="tool-call-content">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Executing...</span>
+                </div>
+            `;
+            card.appendChild(pendingSection);
+        }
+
+        return card;
+    }
+
+    // Format agent name for display
+    formatAgentName(agentName) {
+        // Convert snake_case or kebab-case to Title Case
+        return agentName
+            .replace(/[-_]/g, ' ')
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    // Update existing tool call card with response
+    updateToolCallCard(card, toolCall) {
+        const toolName = toolCall.name;
+        const toolResponse = toolCall.response;
+        
+        // For transfer_to_agent, response is always null, so no need to update
+        if (toolName === 'transfer_to_agent') {
+            return; // Keep the simplified card as is
+        }
+        
+        // Remove pending section if it exists
+        const pendingSection = card.querySelector('.tool-call-pending');
+        if (pendingSection) {
+            pendingSection.remove();
+        }
+        
+        // Add or update response section (only if response is not null)
+        if (toolResponse !== null && toolResponse !== undefined) {
+            let responseSection = card.querySelector('.tool-call-response');
+            if (!responseSection) {
+                responseSection = document.createElement('div');
+                responseSection.className = 'tool-call-section tool-call-response';
+                card.appendChild(responseSection);
+            }
+            
+            responseSection.innerHTML = `
+                <div class="tool-call-label">Response:</div>
+                <div class="tool-call-content">
+                    <pre>${JSON.stringify(toolResponse, null, 2)}</pre>
+                </div>
+            `;
+        }
+    }
+
+    // Format tool name for display
+    formatToolName(toolName) {
+        return toolName
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
     }
 
     containsMarkdownCodeBlocks(content) {
@@ -2373,10 +2653,12 @@ class AgentPlatform {
                         if (response.result && response.result.history) {
                             // Add messages from this task
                             response.result.history.forEach(msg => {
+                                const attachments = this.extractArtifactRefs(msg);
                                 allMessages.push({
                                     id: msg.messageId || this.generateMessageId(),
                                     type: msg.role === 'user' ? 'user' : 'agent',
                                     content: this.formatA2AMessage(msg),
+                                    attachments: attachments.length > 0 ? attachments : undefined,
                                     timestamp: new Date().toISOString(),
                                     agent: msg.role === 'agent' ? this.currentAgentName : null,
                                     taskId: taskId

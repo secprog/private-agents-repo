@@ -25,7 +25,7 @@ class OrchestratorCore:
         self.workflow_agent = Agent(
             name=self.agent_name,
             description="Master orchestrator for routing tasks to specialized agents",
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash",
             instruction="Do nothing, just say: I am discovering available sub-agents...",
             sub_agents=[],
         )

@@ -6,28 +6,33 @@ import logging
 import json
 
 from typing import Dict, Any
-
-from google.genai.types import Part, Blob
+from google.genai.types import Part
+from .models import VisualAnalysisResponse, SecurityAnalysisResponse
 
 logger = logging.getLogger(__name__)
 APP_NAME = "orquestrator"
 
+
 class ArchitectureAnalyzer:
     """Advanced architecture analyzer using AI vision and multi-modal processing"""
-    
-    def __init__(self, artifact_service):        
+
+    def __init__(self, artifact_service):
         # Store the artifact service for loading files
         self.artifact_service = artifact_service
-        logger.info(f"ArchitectureAnalyzer initialized with artifact service: {type(artifact_service)}")
-        if hasattr(artifact_service, 'service_type'):
+        logger.info(
+            f"ArchitectureAnalyzer initialized with artifact service: {type(artifact_service)}"
+        )
+        if hasattr(artifact_service, "service_type"):
             logger.info(f"Artifact service type: {artifact_service.service_type}")
-        if hasattr(artifact_service, 'artifact_service'):
-            logger.info(f"Underlying artifact service: {type(artifact_service.artifact_service)}")
-        
+        if hasattr(artifact_service, "artifact_service"):
+            logger.info(
+                f"Underlying artifact service: {type(artifact_service.artifact_service)}"
+            )
+
         # Store the specialized instructions for different analysis tasks
         self.vision_instructions = self._get_vision_analysis_instructions()
         self.security_instructions = self._get_security_analysis_instructions()
-    
+
     def _get_vision_analysis_instructions(self) -> str:
         """Get specialized instructions for visual analysis"""
         return """
@@ -65,9 +70,9 @@ You are an expert in analyzing system architecture diagrams through computer vis
    - Security model and trust boundaries
    - Data flow patterns
 
-Provide detailed, structured analysis focusing on visual elements and their relationships.
+**CRITICAL: You MUST return your response as valid JSON ONLY. Do NOT use markdown code blocks, do NOT include explanations or descriptions outside the JSON. Your response must start with {{ and end with }} and contain ONLY valid JSON that matches the provided schema.**
 """
-    
+
     def _get_security_analysis_instructions(self) -> str:
         """Get specialized instructions for security analysis"""
         return """
@@ -108,19 +113,27 @@ You are a cybersecurity expert specializing in architecture security analysis. Y
 
 Provide actionable security recommendations and risk assessments.
 """
-    
-    async def security_analysis(self, part: Part, visual_analysis: Dict[str, Any]) -> str:
+
+    async def security_analysis(
+        self, part: Part, visual_analysis: Dict[str, Any]
+    ) -> str:
         """Compreensive Security analysis of the architecture"""
         security_analysis = await self._perform_security_analysis(part, visual_analysis)
         return json.dumps(security_analysis)
 
-    async def analyze_architecture(self, user_id:str, session_id: str, filename: str) -> str:
+    async def analyze_architecture(
+        self, user_id: str, session_id: str, filename: str
+    ) -> str:
         """Comprehensive architecture analysis using AI vision and security expertise"""
         try:
-            logger.info(f"Starting architecture analysis for session_id={session_id}, filename={filename}")
-            
+            logger.info(
+                f"Starting architecture analysis for session_id={session_id}, filename={filename}"
+            )
+
             # Load artifact using artifact_service directly
-            logger.info(f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}")
+            logger.info(
+                f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
+            )
             part = await self.artifact_service.load_artifact(
                 app_name=APP_NAME,
                 user_id=user_id,
@@ -128,26 +141,35 @@ Provide actionable security recommendations and risk assessments.
                 filename=filename,
                 version=None,
             )
-            
+
             if not part or not part.inline_data:
                 logger.error(f"Could not load artifact")
-                logger.error(f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}")
-                raise ValueError(f"Could not load artifact: {filename} from session {session_id}")
-            
-            logger.info(f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})")
-            
+                logger.error(
+                    f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
+                )
+                raise ValueError(
+                    f"Could not load artifact: {filename} from session {session_id}"
+                )
+
+            logger.info(
+                f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"
+            )
+
             visual_analysis = await self._perform_visual_analysis(part, filename)
             return json.dumps(visual_analysis)
-            
+
         except Exception as e:
             logger.error(f"Failed to analyze architecture: {e}")
             raise
-    
-    
-    async def _perform_visual_analysis(self, part: Part, filename: str) -> Dict[str, Any]:
+
+    async def _perform_visual_analysis(
+        self, part: Part, filename: str
+    ) -> Dict[str, Any]:
         """Perform detailed visual analysis of the architecture diagram"""
-        
+
         visual_prompt = f"""
+**CRITICAL INSTRUCTION: You MUST return ONLY valid JSON. Do NOT include any markdown formatting, explanations, descriptions, or text outside of the JSON. Your ENTIRE response must be valid JSON that can be parsed directly.**
+
 Analyze this architecture diagram with advanced computer vision capabilities. 
 
 For the file "{filename}", provide a comprehensive visual analysis including:
@@ -190,120 +212,127 @@ For the file "{filename}", provide a comprehensive visual analysis including:
    - Uniqueness of component identification
    - Ambiguity in connections or relationships
 
-Return your analysis as structured JSON following the provided schema, including confidence scores for each element.
+**CRITICAL: You MUST return JSON that EXACTLY matches this structure. Do NOT create your own structure. The response MUST have these exact top-level fields:**
+
+{{
+  "visual_components": [
+    {{
+      "name": "string",
+      "component_type": "database|application|gateway|cloud_service|load_balancer|firewall|proxy|cache|queue|storage|compute|network|monitoring|other",
+      "visual_type": "box|circle|icon|diamond|cylinder|cloud|other",
+      "position": {{"x": number, "y": number}},
+      "text_content": "string",
+      "visual_group": "string",
+      "confidence": 0.0-1.0
+    }}
+  ],
+  "visual_connections": [
+    {{
+      "source": "string",
+      "target": "string",
+      "connection_type": "arrow|line|dotted|dashed|thick|bidirectional|other",
+      "direction": "unidirectional|bidirectional|unknown",
+      "labels": ["string"],
+      "confidence": 0.0-1.0
+    }}
+  ],
+  "visual_zones": [
+    {{
+      "name": "string",
+      "boundary_type": "dashed_line|box|color|border|background|other",
+      "components": ["string"]
+    }}
+  ],
+  "extracted_text": ["string"],
+  "technology_indicators": ["string"]
+}}
+
+**ALL fields are REQUIRED. Every component MUST have all fields including position, visual_group, and confidence. Every connection MUST have all fields including labels and confidence.**
+
+**REMEMBER: Return ONLY the JSON object. No markdown code blocks, no explanations, no text before or after. Start with {{ and end with }}.**
 """
-        
+
         # Use the LLM directly for efficient analysis
         from google.adk.models.registry import LLMRegistry
         from google.adk.models.llm_request import LlmRequest
         from google.genai import types
+
+        llm = LLMRegistry.new_llm("gemini-2.5-flash-preview-09-2025 ")
+
+        # Use Pydantic model for visual analysis response schema
+        visual_schema = VisualAnalysisResponse
         
-        llm = LLMRegistry.new_llm("gemini-2.0-flash")
-        
-        # Define JSON schema for visual analysis response
-        visual_schema = {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "title": "Visual Analysis Response",
-            "type": "object",
-            "properties": {
-                "visual_components": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "component_type": {"type": "string", "enum": ["database", "application", "gateway", "cloud_service", "load_balancer", "firewall", "proxy", "cache", "queue", "storage", "compute", "network", "monitoring", "other"]},
-                            "visual_type": {"type": "string", "enum": ["box", "circle", "icon", "diamond", "cylinder", "cloud", "other"]},
-                            "position": {
-                                "type": "object",
-                                "properties": {
-                                    "x": {"type": "number"},
-                                    "y": {"type": "number"}
-                                },
-                                "required": ["x", "y"]
-                            },
-                            "text_content": {"type": "string"},
-                            "visual_group": {"type": "string"},
-                            "confidence": {
-                                "type": "number",
-                                "minimum": 0.0,
-                                "maximum": 1.0,
-                                "description": "Confidence score for component identification (0.0-1.0)"
-                            }
-                        },
-                        "required": ["name", "component_type", "visual_type", "position", "text_content", "confidence"]
-                    }
-                },
-                "visual_connections": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "source": {"type": "string"},
-                            "target": {"type": "string"},
-                            "connection_type": {"type": "string", "enum": ["arrow", "line", "dotted", "dashed", "thick", "bidirectional", "other"]},
-                            "direction": {"type": "string", "enum": ["unidirectional", "bidirectional", "unknown"]},
-                            "labels": {"type": "array", "items": {"type": "string"}},
-                            "confidence": {
-                                "type": "number",
-                                "minimum": 0.0,
-                                "maximum": 1.0,
-                                "description": "Confidence score for connection identification (0.0-1.0)"
-                            }
-                        },
-                        "required": ["source", "target", "connection_type", "direction", "labels", "confidence"]
-                    }
-                },
-                "visual_zones": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "boundary_type": {"type": "string", "enum": ["dashed_line", "box", "color", "border", "background", "other"]},
-                            "components": {"type": "array", "items": {"type": "string"}}
-                        },
-                        "required": ["name", "boundary_type", "components"]
-                    }
-                },
-                "extracted_text": {"type": "array", "items": {"type": "string"}},
-                "technology_indicators": {"type": "array", "items": {"type": "string"}}
-            },
-            "required": ["visual_components", "visual_connections", "visual_zones", "extracted_text", "technology_indicators"]
-        }
-        
+        # Convert Pydantic model to JSON schema dict for response_json_schema
+        visual_schema_dict = visual_schema.model_json_schema()
+
         # Create LlmRequest (ADK's request object)
         llm_request = LlmRequest(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash-preview-09-2025",
             contents=[
                 types.Content(
                     role="user",
                     parts=[
                         types.Part.from_text(text=visual_prompt),
-                        part  # The image part
-                    ]
+                        part,  # The image part
+                    ],
                 )
             ],
             config=types.GenerateContentConfig(
                 system_instruction=self.vision_instructions,
                 temperature=0.1,
-                response_json_schema=visual_schema,
-                response_mime_type="application/json"
-            )
+                max_output_tokens=65535,
+                response_mime_type="application/json",
+                response_json_schema=visual_schema_dict,  # Also set in config
+            ),
         )
-        
+
+        llm_request.set_output_schema(visual_schema)  # Set via method as well
+
         # Call the LLM - this returns an async generator
         response_text = ""
+        finish_reason = None
+        response_count = 0
         async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            response_count += 1
             if llm_response.content and llm_response.content.parts:
-                response_text = llm_response.content.parts[0].text
-                break  # For non-streaming, there's only one response
-        
+                # Collect all text parts in case there are multiple
+                text_parts = []
+                for part in llm_response.content.parts:
+                    if hasattr(part, "text") and part.text:
+                        text_parts.append(part.text)
+                if text_parts:
+                    response_text += "".join(text_parts)  # Accumulate, don't replace
+
+            # Check finish reason to detect truncation (update from last response)
+            if hasattr(llm_response, "finish_reason"):
+                finish_reason = llm_response.finish_reason
+            elif hasattr(llm_response, "candidates") and llm_response.candidates:
+                if hasattr(llm_response.candidates[0], "finish_reason"):
+                    finish_reason = llm_response.candidates[0].finish_reason
+
+        if not response_text:
+            logger.error("Empty response from LLM")
+            raise ValueError("Empty response from LLM - no text content received")
+
+        # Check if response was truncated
+        if finish_reason and finish_reason in [
+            "MAX_TOKENS",
+            "LENGTH",
+            "MAX_OUTPUT_TOKENS",
+        ]:
+            logger.warning(f"Response may be truncated. Finish reason: {finish_reason}")
+            logger.warning(f"Response length: {len(response_text)} characters")
+
+        logger.debug(
+            f"Collected {response_count} responses, total length: {len(response_text)}, finish_reason: {finish_reason}"
+        )
         return self._parse_json_response(response_text)
-    
-    async def _perform_security_analysis(self, part: Part, visual_analysis: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _perform_security_analysis(
+        self, part: Part, visual_analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Perform security-focused analysis"""
-        
+
         security_prompt = f"""
 Based on the visual analysis provided, perform a comprehensive security assessment of this architecture:
 
@@ -349,121 +378,182 @@ Security Analysis Tasks:
    - Security domain classification certainty
    - Risk assessment confidence
 
-Return structured security analysis following the provided JSON schema, including confidence scores for each assessment.
+**CRITICAL: You MUST return JSON that EXACTLY matches this structure. Do NOT create your own structure. The response MUST have these exact top-level fields:**
+
+{{
+  "component_security": [
+    {{
+      "component_name": "string",
+      "component_type": "database|application|gateway|cloud_service|load_balancer|firewall|proxy|cache|queue|storage|compute|network|monitoring|other",
+      "security_domain": "Internet|Intranet|DMZ|Cloud|Unknown",
+      "technology": "string",
+      "exposure_level": "High|Medium|Low",
+      "security_concerns": ["string"],
+      "confidence": 0.0-1.0
+    }}
+  ],
+  "connection_security": [
+    {{
+      "source": "string",
+      "target": "string",
+      "protocol": "string",
+      "security_level": "Secure|Insecure|Unknown",
+      "encryption": "Encrypted|Unencrypted|Unknown",
+      "security_concerns": ["string"],
+      "confidence": 0.0-1.0
+    }}
+  ],
+  "security_zones": [
+    {{
+      "zone_name": "string",
+      "security_level": "High|Medium|Low",
+      "components": ["string"],
+      "boundary_controls": ["string"]
+    }}
+  ],
+  "security_concerns": ["string"],
+  "recommendations": ["string"]
+}}
+
+**ALL fields are REQUIRED. Every component_security entry MUST have all fields including confidence. Every connection_security entry MUST have all fields including confidence.**
 """
-        
+
         # Use the LLM directly for efficient analysis
         from google.adk.models.registry import LLMRegistry
         from google.adk.models.llm_request import LlmRequest
         from google.genai import types
+
+        llm = LLMRegistry.new_llm("gemini-2.5-flash-preview-09-2025")
+
+        # Use Pydantic model for security analysis response schema
+        security_schema = SecurityAnalysisResponse
         
-        llm = LLMRegistry.new_llm("gemini-2.0-flash")
-        
-        # Define JSON schema for security analysis response
-        security_schema = {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "title": "Security Analysis Response",
-            "type": "object",
-            "properties": {
-                "component_security": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "component_name": {"type": "string"},
-                            "component_type": {"type": "string", "enum": ["database", "application", "gateway", "cloud_service", "load_balancer", "firewall", "proxy", "cache", "queue", "storage", "compute", "network", "monitoring", "other"]},
-                            "security_domain": {"type": "string", "enum": ["Internet", "Intranet", "DMZ", "Cloud", "Unknown"]},
-                            "technology": {"type": "string"},
-                            "exposure_level": {"type": "string", "enum": ["High", "Medium", "Low"]},
-                            "security_concerns": {"type": "array", "items": {"type": "string"}},
-                            "confidence": {
-                                "type": "number",
-                                "minimum": 0.0,
-                                "maximum": 1.0,
-                                "description": "Confidence score for security assessment (0.0-1.0)"
-                            }
-                        },
-                        "required": ["component_name", "component_type", "security_domain", "exposure_level", "security_concerns", "confidence"]
-                    }
-                },
-                "connection_security": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "source": {"type": "string"},
-                            "target": {"type": "string"},
-                            "protocol": {"type": "string"},
-                            "security_level": {"type": "string", "enum": ["Secure", "Insecure", "Unknown"]},
-                            "encryption": {"type": "string", "enum": ["Encrypted", "Unencrypted", "Unknown"]},
-                            "security_concerns": {"type": "array", "items": {"type": "string"}},
-                            "confidence": {
-                                "type": "number",
-                                "minimum": 0.0,
-                                "maximum": 1.0,
-                                "description": "Confidence score for connection security assessment (0.0-1.0)"
-                            }
-                        },
-                        "required": ["source", "target", "protocol", "security_level", "encryption", "security_concerns", "confidence"]
-                    }
-                },
-                "security_zones": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "zone_name": {"type": "string"},
-                            "security_level": {"type": "string", "enum": ["High", "Medium", "Low"]},
-                            "components": {"type": "array", "items": {"type": "string"}},
-                            "boundary_controls": {"type": "array", "items": {"type": "string"}}
-                        },
-                        "required": ["zone_name", "security_level", "components", "boundary_controls"]
-                    }
-                },
-                "security_concerns": {"type": "array", "items": {"type": "string"}},
-                "recommendations": {"type": "array", "items": {"type": "string"}}
-            },
-            "required": ["component_security", "connection_security", "security_zones", "security_concerns", "recommendations"]
-        }
-        
+        # Convert Pydantic model to JSON schema dict for response_json_schema
+        security_schema_dict = security_schema.model_json_schema()
+
         # Create LlmRequest (ADK's request object)
         llm_request = LlmRequest(
-            model="gemini-2.0-flash",
+            model="gemini-2.5-flash-preview-09-2025",
             contents=[
                 types.Content(
                     role="user",
                     parts=[
                         types.Part.from_text(text=security_prompt),
-                        part  # The image part
-                    ]
+                        part,  # The image part
+                    ],
                 )
             ],
             config=types.GenerateContentConfig(
                 system_instruction=self.security_instructions,
                 temperature=0.1,
-                response_json_schema=security_schema,
-                response_mime_type="application/json"
-            )
+                response_mime_type="application/json",
+                max_output_tokens=65535,
+                response_json_schema=security_schema_dict,  # Also set in config
+            ),
         )
-        
+        llm_request.set_output_schema(security_schema)  # Set via method as well
         # Call the LLM - this returns an async generator
         response_text = ""
+        finish_reason = None
+        response_count = 0
         async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            response_count += 1
             if llm_response.content and llm_response.content.parts:
-                response_text = llm_response.content.parts[0].text
-                break  # For non-streaming, there's only one response
-        
+                # Collect all text parts in case there are multiple
+                text_parts = []
+                for part in llm_response.content.parts:
+                    if hasattr(part, "text") and part.text:
+                        text_parts.append(part.text)
+                if text_parts:
+                    response_text += "".join(text_parts)  # Accumulate, don't replace
+
+            # Check finish reason to detect truncation (update from last response)
+            if hasattr(llm_response, "finish_reason"):
+                finish_reason = llm_response.finish_reason
+            elif hasattr(llm_response, "candidates") and llm_response.candidates:
+                if hasattr(llm_response.candidates[0], "finish_reason"):
+                    finish_reason = llm_response.candidates[0].finish_reason
+
+        if not response_text:
+            logger.error("Empty response from LLM")
+            raise ValueError("Empty response from LLM - no text content received")
+
+        # Check if response was truncated
+        if finish_reason and finish_reason in [
+            "MAX_TOKENS",
+            "LENGTH",
+            "MAX_OUTPUT_TOKENS",
+        ]:
+            logger.warning(f"Response may be truncated. Finish reason: {finish_reason}")
+            logger.warning(f"Response length: {len(response_text)} characters")
+
+        logger.debug(
+            f"Collected {response_count} responses, total length: {len(response_text)}, finish_reason: {finish_reason}"
+        )
         return self._parse_json_response(response_text)
-    
-    
+
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
-        """Parse JSON response with fallback"""
+        """Parse JSON response with fallback - detects incomplete JSON and handles markdown"""
+        if not text:
+            raise ValueError("Empty response text")
+
+        # Log the raw response for debugging
+        logger.debug(f"Raw response (first 500 chars): {text[:500]}")
+        logger.debug(f"Raw response (last 500 chars): {text[-500:]}")
+
+        # Remove markdown code blocks if present
+        text_cleaned = text.strip()
+        if text_cleaned.startswith("```json"):
+            text_cleaned = text_cleaned[7:].strip()
+        elif text_cleaned.startswith("```"):
+            text_cleaned = text_cleaned[3:].strip()
+        if text_cleaned.endswith("```"):
+            text_cleaned = text_cleaned[:-3].strip()
+
+        # Check if response looks like JSON (starts with {)
+        if not text_cleaned.strip().startswith("{"):
+            logger.error(f"Response does not appear to be JSON. First 200 chars: {text_cleaned[:200]}")
+            raise ValueError(
+                f"Response is not JSON format. The model returned text/markdown instead of JSON. "
+                f"Please check the prompt and schema configuration. Response preview: {text_cleaned[:500]}"
+            )
+
         try:
-            json_start = text.find('{')
-            json_end = text.rfind('}') + 1
+            json_start = text_cleaned.find("{")
+            json_end = text_cleaned.rfind("}") + 1
             if json_start != -1 and json_end > json_start:
-                json_str = text[json_start:json_end]
+                json_str = text_cleaned[json_start:json_end]
+                logger.debug(f"Extracted JSON string (length: {len(json_str)})")
+
+                # Check if JSON appears incomplete by counting brackets
+                open_braces = json_str.count("{")
+                close_braces = json_str.count("}")
+                open_brackets = json_str.count("[")
+                close_brackets = json_str.count("]")
+
+                if open_braces != close_braces or open_brackets != close_brackets:
+                    logger.error(
+                        f"Incomplete JSON detected. Braces: {open_braces} open, {close_braces} close. Brackets: {open_brackets} open, {close_brackets} close"
+                    )
+                    logger.error(f"JSON preview (last 500 chars): ...{json_str[-500:]}")
+                    raise ValueError(
+                        f"Incomplete JSON response - missing closing brackets. Response may have been truncated. JSON length: {len(json_str)}"
+                    )
+
                 return json.loads(json_str)
-        except json.JSONDecodeError:
-            raise ValueError(f"Invalid JSON response: {text}")
-    
+            else:
+                raise ValueError(f"Could not find JSON boundaries in response.")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            logger.error(f"Error at position {e.pos}: {e.msg}")
+            # Check if error suggests incomplete JSON
+            if e.msg and ("Expecting" in e.msg or "Unterminated" in e.msg):
+                logger.error(
+                    f"JSON appears incomplete. Last 200 chars: ...{text[-200:]}"
+                )
+                raise ValueError(
+                    f"Incomplete JSON response - parsing failed at position {e.pos}: {e.msg}. Response may have been truncated."
+                )
+            raise ValueError(
+                f"Invalid JSON response. Error: {e.msg} at position {e.pos if hasattr(e, 'pos') else 'unknown'}"
+            )

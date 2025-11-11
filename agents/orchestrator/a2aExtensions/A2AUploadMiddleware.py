@@ -6,10 +6,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 
-from pydantic import BaseModel
-from typing import Optional
-
-
 logger = logging.getLogger(__name__)
 
 uploads = {}
