@@ -93,16 +93,7 @@ pip install -r agents/devops/requirements.txt
 
 ### 3. Configure LLM Provider
 
-#### Option A: OpenAI (Recommended)
-```bash
-# Set your OpenAI API key
-export OPENAI_API_KEY="your-openai-api-key-here"
-
-# Or create a .env file
-echo "OPENAI_API_KEY=your-openai-api-key-here" > .env
-```
-
-#### Option B: Google Gemini
+#### Google Gemini
 ```bash
 # Set your Google AI API key
 export GOOGLE_API_KEY="your-google-ai-api-key-here"
@@ -111,14 +102,7 @@ export GOOGLE_API_KEY="your-google-ai-api-key-here"
 echo "GOOGLE_API_KEY=your-google-ai-api-key-here" > .env
 ```
 
-**Note**: You only need one API key. The platform will automatically detect which provider to use based on the available API key.
-
-### 4. Generate SSL Certificates (Development)
-```bash
-bash generate-ssl.sh
-```
-
-### 5. Start the Platform
+### 4. Start the Platform
 
 #### Option A: Docker Compose (Recommended for Production)
 ```bash
@@ -144,18 +128,6 @@ python -m agents.devops.devops_agent
 cd frontend
 npm install
 npm start
-```
-
-### 6. Test LLM Integration
-```bash
-# Test OpenAI integration (if OPENAI_API_KEY is set)
-python test_complete_openai_integration.py
-
-# Test file handling capabilities
-python test_openai_files_api.py
-
-# Test agent creation
-python examples/openai_agent_example.py
 ```
 
 ### 7. Access the Platform
@@ -370,14 +342,6 @@ fetch('https://localhost:8000', {
 ### LLM Providers
 The platform supports multiple LLM providers with automatic detection:
 
-#### OpenAI Models
-- **GPT-4o**: Best for general tasks with vision capabilities
-- **GPT-4o-mini**: Faster, cost-effective option
-- **GPT-4-turbo**: High-performance text processing
-- **GPT-3.5-turbo**: Fast and economical
-- **O1-preview**: Advanced reasoning capabilities
-- **O1-mini**: Faster reasoning model
-
 #### Google Gemini Models
 - **gemini-2.0-flash**: Latest Gemini model with advanced capabilities
 - **gemini-1.5-pro**: High-performance model
@@ -385,54 +349,7 @@ The platform supports multiple LLM providers with automatic detection:
 
 ### Model Selection
 The platform automatically selects the best available model based on your API key:
-- If `OPENAI_API_KEY` is set → Uses OpenAI models
 - If `GOOGLE_API_KEY` is set → Uses Gemini models
-- If both are set → Prefers OpenAI (can be configured)
-
-## 🤖 LLM Setup & Usage
-
-### OpenAI Setup
-
-#### 1. Get OpenAI API Key
-1. Go to [OpenAI Platform](https://platform.openai.com)
-2. Sign up or log in to your account
-3. Navigate to API Keys section
-4. Create a new API key
-5. Copy the key (starts with `sk-`)
-
-#### 2. Configure OpenAI
-```bash
-# Set environment variable
-export OPENAI_API_KEY="sk-your-api-key-here"
-
-# Or add to .env file
-echo "OPENAI_API_KEY=sk-your-api-key-here" >> .env
-```
-
-#### 3. Test OpenAI Integration
-```bash
-# Test the integration
-python test_complete_openai_integration.py
-```
-
-#### 4. Use OpenAI in Your Code
-```python
-from google.adk.agents import Agent
-
-# Simple usage - platform auto-detects OpenAI
-agent = Agent(model="gpt-4o")
-
-# Advanced configuration
-from shared.models import OpenAI
-
-openai_llm = OpenAI(
-    model="gpt-4o",
-    max_tokens=1000,
-    temperature=0.7,
-    use_files_api=True  # Enable Files API for document uploads
-)
-agent = Agent(model=openai_llm)
-```
 
 ### Google Gemini Setup
 
@@ -476,35 +393,6 @@ agent = Agent(model="gemini-2.0-flash")
 - **Documents**: Word docs, text files
 - **File References**: Full URI support (GCS, HTTPS)
 
-### Model Comparison
-
-| Feature | OpenAI | Gemini |
-|---------|--------|--------|
-| **Text Processing** | ✅ Excellent | ✅ Excellent |
-| **Image Analysis** | ✅ Vision models | ✅ Native support |
-| **PDF Processing** | ✅ Files API + Vision | ✅ Direct support |
-| **File References** | ❌ No URI support | ✅ Full URI support |
-| **Cost** | Higher | Lower |
-| **Speed** | Fast | Very Fast |
-| **Reasoning** | ✅ O1 models | ✅ Advanced |
-
-### Choosing the Right Model
-
-#### For General Tasks
-- **OpenAI**: `gpt-4o` (best overall performance)
-- **Gemini**: `gemini-2.0-flash` (fast and capable)
-
-#### For Cost Optimization
-- **OpenAI**: `gpt-4o-mini` (good performance, lower cost)
-- **Gemini**: `gemini-1.5-flash` (very cost-effective)
-
-#### For Advanced Reasoning
-- **OpenAI**: `o1-preview` (advanced reasoning)
-- **Gemini**: `gemini-2.0-flash` (good reasoning)
-
-#### For File Processing
-- **OpenAI**: `gpt-4o` with Files API (excellent for documents)
-- **Gemini**: `gemini-2.0-flash` (native file support)
 
 ### SSL/TLS
 - Development uses self-signed certificates

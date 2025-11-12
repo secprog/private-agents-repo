@@ -24,7 +24,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
-session_service = DatabaseSessionService(db_url=os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform"))
+# Use postgresql+psycopg:// for async driver (psycopg 3.x)
+db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
+# Convert postgresql:// to postgresql+psycopg:// for async support
+if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+session_service = DatabaseSessionService(db_url=db_url)
 # Initialize orchestrator
 orchestrator_core = OrchestratorCore()
 

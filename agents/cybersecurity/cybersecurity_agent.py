@@ -21,34 +21,43 @@ logger = logging.getLogger(__name__)
 agent_name = "cybersecurity-agent"
 # Initialize cybersecurity agent
 artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
-session_service = DatabaseSessionService(db_url=os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform"))
-
+# Use postgresql+psycopg:// for async driver (psycopg 3.x)
+db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
+# Convert postgresql:// to postgresql+psycopg:// for async support
+if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+# Use postgresql+psycopg:// for async driver (psycopg 3.x)
+db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
+# Convert postgresql:// to postgresql+psycopg:// for async support
+if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+session_service = DatabaseSessionService(db_url=db_url)
 architecture_analyzer = ArchitectureAnalyzer(artifact_service=artifact_service)
 
 # Create architecture analysis sub-agent
 architecture_sub_agent = Agent(
     name="architecture_analyzer",
     description="Specialized sub-agent for analyzing system architecture diagrams",
-    model="gemini-2.0-flash",
-    instruction="Analyze architecture diagrams and extract components, connections, technologies, and security domains, outputs in json format",
+    model="gemini-2.5-flash-preview-09-2025",
+    instruction="Analyze architecture diagrams and extract components, connections, technologies, and security domains, outputs in json format. CRITICAL: You MUST use tools to analyze the architecture, you do not touch the input or output, you only delegate to the tools.",
     tools=[architecture_analyzer.analyze_architecture]
 )
 
-cybersecurity_architect_sub_agent = Agent(
-    name="cybersecurity_architect",
-    description="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments",
-    model="gemini-2.0-flash",
-    instruction="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments outputs in json format",
-    tools=[architecture_analyzer.security_analysis]
-)
+# cybersecurity_architect_sub_agent = Agent(
+#     name="cybersecurity_architect",
+#     description="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments",
+#     model="gemini-2.5-flash-preview-09-2025",
+#     instruction="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments outputs in json format",
+#     tools=[architecture_analyzer.security_analysis]
+# )
 
 # Create A2A server using ADK SDK directly
 root_agent = Agent(
     name=agent_name.replace("-", "_"),
     description="Specialized agent for cybersecurity.",
-    model="gemini-2.0-flash",
-    instruction="For cybersecurity tasks, you delegate to the most appropriate sub-agent.",
-    sub_agents=[architecture_sub_agent, cybersecurity_architect_sub_agent],
+    model="gemini-2.5-flash-preview-09-2025",
+    instruction="For cybersecurity tasks, you delegate to the most appropriate sub-agent. You do not touch sub-agent's input or output, you only delegate to them.",
+    sub_agents=[architecture_sub_agent],
 )
 
 app = to_a2a(

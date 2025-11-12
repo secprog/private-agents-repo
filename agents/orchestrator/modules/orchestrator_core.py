@@ -10,6 +10,7 @@ from typing import List
 
 from google.adk.agents import Agent
 from google.adk.agents.remote_a2a_agent import RemoteA2aAgent, AGENT_CARD_WELL_KNOWN_PATH
+from google.adk.models.lite_llm import LiteLlm
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,12 @@ class OrchestratorCore:
         self.agent_id = "orchestrator"
         
         # Initialize ADK workflow agent with basic setup (will be updated after discovery)
+        # Use LiteLLM which is natively supported by Google ADK
         self.agent_name = self.agent_id.replace("-", "_")
         self.workflow_agent = Agent(
             name=self.agent_name,
             description="Master orchestrator for routing tasks to specialized agents",
-            model="gemini-2.5-flash",
+            model=LiteLlm(model="openai/gpt-4o"),
             instruction="Do nothing, just say: I am discovering available sub-agents...",
             sub_agents=[],
         )

@@ -1,8 +1,6 @@
 # Google ADK SDK - Core packages
-google-adk @ git+https://github.com/google/adk-python@main
+google-adk[all] @ git+https://github.com/google/adk-python@main
 a2a-sdk[all]>=0.3.11
-google-adk[llm]>=1.18.0
-google-adk[a2a]>=1.18.0
 google-genai>=1.0.0
 
 # Web Framework
@@ -10,11 +8,11 @@ fastapi>=0.110.0
 uvicorn>=0.25.0
 
 # Database and Storage
-psycopg2-binary>=2.9.0
+# Use psycopg (async) instead of psycopg2-binary (sync) for async SQLAlchemy
+psycopg[binary]>=3.1.0
 sqlalchemy>=2.0.0
 
-# LLM Integration
-openai>=1.40.0
+litellm>=1.79.3
 
 # Utilities
 pydantic>=2.10.0
