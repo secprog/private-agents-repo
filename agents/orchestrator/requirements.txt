@@ -1,5 +1,7 @@
 # Google ADK SDK - Core packages
 google-adk[all] @ git+https://github.com/google/adk-python@main
+google-adk-community @ git+https://github.com/secprog/adk-python-community@main
+
 a2a-sdk[all]>=0.3.11
 google-genai>=1.0.0
 
