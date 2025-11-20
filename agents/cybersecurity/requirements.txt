@@ -1,5 +1,5 @@
 # Google ADK SDK and A2A Protocol
-google-adk @ git+https://github.com/google/adk-python@main
+google-adk @ git+https://github.com/secprog/adk-python@main
 google-adk-community @ git+https://github.com/secprog/adk-python-community@main
 a2a-sdk[all]>=0.3.11
 

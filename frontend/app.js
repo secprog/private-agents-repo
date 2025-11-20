@@ -173,6 +173,7 @@ class AgentPlatform {
         this.agents = [];
         this.attachments = [];
         this.isTyping = false;
+        this.processingSessions = new Set(); // Track which sessions are currently processing
         this.toolCallMessages = new Map(); // Track tool calls by ID to match requests and responses
 
         // Initialize A2A upload service
@@ -1073,19 +1074,25 @@ class AgentPlatform {
             console.log('Using existing sessionId:', this.sessionId);
         }
 
+        // Save a copy of attachments before clearing (needed for both chat display and message sending)
+        let attachmentsCopy = [...this.attachments];
+        
         // Add user message to chat
         this.addMessageToChat({
             id: this.generateMessageId(),
             type: 'user',
             content: content,
-            attachments: [...this.attachments],
+            attachments: [...attachmentsCopy], // Create another copy for chat message
             timestamp: new Date().toISOString()
         });
 
-        // Clear input (but keep attachments for now)
+        // Clear input and attachments preview immediately (after copying to message)
         messageInput.value = '';
         messageInput.style.height = 'auto';
         document.getElementById('sendBtn').disabled = true;
+        
+        // Clear attachments from input preview (chat message already has its own copy)
+        this.clearAttachments();
 
         // Hide welcome message if visible
         const welcomeMessage = document.getElementById('welcomeMessage');
@@ -1093,8 +1100,8 @@ class AgentPlatform {
             welcomeMessage.style.display = 'none';
         }
 
-        // Show typing indicator
-        this.showTypingIndicator();
+        // Show typing indicator for current session
+        this.showTypingIndicator(this.sessionId);
 
         // Send via JSON-RPC using A2A's message/send method
         try {
@@ -1105,7 +1112,8 @@ class AgentPlatform {
             }];
 
             // Add attached files as DataPart with artifact references (A2A compliant)
-            for (const attachment of this.attachments) {
+            // Use the saved copy since this.attachments was cleared for UI
+            for (const attachment of attachmentsCopy) {
                 if (attachment.uploaded && attachment.filename) {
                     // Use proper A2A DataPart with artifact reference
                     parts.push({
@@ -1126,6 +1134,9 @@ class AgentPlatform {
                     return;
                 }
             }
+            
+            // Clear attachmentsCopy after using it to build message parts
+            attachmentsCopy = [];
 
             // Build message object - always create new task for each message
             const messageObj = {
@@ -1147,10 +1158,11 @@ class AgentPlatform {
                     user_id: this.userId
                 }
             });
-            this.handleAgentResponse(response, sendingSessionId);
-
-            // Clear attachments AFTER successful send
+            
+            // Ensure attachments are cleared after successful send (cleanup)
             this.clearAttachments();
+            
+            this.handleAgentResponse(response, sendingSessionId);
         } catch (error) {
             console.error('Error sending message:', error);
 
@@ -1160,6 +1172,13 @@ class AgentPlatform {
                 this.showToast('Failed to send message', 'error');
             }
 
+            // Clear attachments even on error (message was attempted to be sent)
+            this.clearAttachments();
+
+            // Remove session from processing set on error
+            if (this.processingSessions.has(sendingSessionId)) {
+                this.processingSessions.delete(sendingSessionId);
+            }
             this.hideTypingIndicator();
         }
     }
@@ -1170,7 +1189,14 @@ class AgentPlatform {
 
 
     handleAgentResponse(data, capturedSessionId = null) {
-        this.hideTypingIndicator();
+        // Remove session from processing set when response is received
+        if (capturedSessionId && this.processingSessions.has(capturedSessionId)) {
+            this.processingSessions.delete(capturedSessionId);
+            // Hide typing indicator if this was the current session
+            if (capturedSessionId === this.sessionId) {
+                this.hideTypingIndicator();
+            }
+        }
 
         console.log('Raw A2A response:', data);
 
@@ -1818,18 +1844,39 @@ class AgentPlatform {
     }
 
 
-    showTypingIndicator() {
+    showTypingIndicator(sessionId = null) {
+        const targetSessionId = sessionId || this.sessionId;
         const indicator = document.getElementById('typingIndicator');
-        indicator.style.display = 'flex';
-
-        // Auto-scroll
-        const container = document.querySelector('.chat-container');
-        container.scrollTop = container.scrollHeight;
+        
+        // Add session to processing set
+        if (targetSessionId) {
+            this.processingSessions.add(targetSessionId);
+        }
+        
+        // Only show indicator if current session is processing
+        if (this.processingSessions.has(this.sessionId)) {
+            indicator.style.display = 'flex';
+            this.isTyping = true;
+            
+            // Auto-scroll
+            const container = document.querySelector('.chat-container');
+            container.scrollTop = container.scrollHeight;
+        }
     }
 
-    hideTypingIndicator() {
-        const indicator = document.getElementById('typingIndicator');
-        indicator.style.display = 'none';
+    hideTypingIndicator(sessionId = null) {
+        const targetSessionId = sessionId || this.sessionId;
+        
+        // Only hide if current session is the target, or if no target specified and current session is not processing
+        if (!targetSessionId || targetSessionId === this.sessionId) {
+            const indicator = document.getElementById('typingIndicator');
+            
+            // Only hide if current session is not in processing set
+            if (!this.processingSessions.has(this.sessionId)) {
+                indicator.style.display = 'none';
+                this.isTyping = false;
+            }
+        }
     }
 
     async handleFileAttachment(event) {
@@ -2323,6 +2370,13 @@ class AgentPlatform {
             console.warn('chatMessages element not found');
         }
 
+        // Clear tool call messages map to prevent stale references
+        this.toolCallMessages.clear();
+
+        // Hide typing indicator from previous session (new chat means no processing for this session)
+        this.hideTypingIndicator();
+        // Note: Don't clear processingSessions Set - other sessions may still be processing
+
         // Show welcome message for new session
         const welcomeMessage = document.getElementById('welcomeMessage');
         if (welcomeMessage) {
@@ -2351,6 +2405,8 @@ class AgentPlatform {
                 if (chatMessages) {
                     chatMessages.innerHTML = '';
                 }
+                // Clear tool call messages map to prevent stale references
+                this.toolCallMessages.clear();
                 this.showToast('Chat cleared', 'success');
             }
         );
@@ -2618,6 +2674,19 @@ class AgentPlatform {
                 }
             } else {
                 console.error('chatMessages element not found');
+            }
+
+            // Clear tool call messages map to prevent stale references
+            this.toolCallMessages.clear();
+
+            // Show typing indicator if this session is still processing
+            // Hide it if switching to a different session that's not processing
+            if (this.processingSessions.has(sessionId)) {
+                // This session is still processing, show typing indicator
+                this.showTypingIndicator(sessionId);
+            } else {
+                // This session is not processing, hide typing indicator
+                this.hideTypingIndicator();
             }
 
             // Hide welcome message

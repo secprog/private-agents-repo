@@ -4,6 +4,8 @@ Orchestrator Agent - Main entry point using ADK SDK
 
 import logging
 import os
+from sqlalchemy.ext.asyncio import create_async_engine  
+from a2a.server.tasks import DatabaseTaskStore
 from google.adk.sessions.database_session_service import DatabaseSessionService
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,9 +28,11 @@ logger = logging.getLogger(__name__)
 artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
 db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
+
 # Convert postgresql:// to postgresql+psycopg:// for async support
 if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+engine = create_async_engine(db_url)  
 session_service = DatabaseSessionService(db_url=db_url)
 # Initialize orchestrator
 orchestrator_core = OrchestratorCore()
@@ -73,6 +77,7 @@ app = to_a2a(
         memory_service=InMemoryMemoryService(),
         credential_service=InMemoryCredentialService(),
     ),
+    task_store=DatabaseTaskStore(engine=engine),
 )
 
 # Add A2A Upload middleware

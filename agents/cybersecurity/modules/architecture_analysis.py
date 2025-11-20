@@ -147,4 +147,44 @@ class ArchitectureAnalysis:
         logger.debug(
             f"Collected {response_count} responses, total length: {len(response_text)}, finish_reason: {finish_reason}"
         )
-        return json.dumps(json.loads(response_text))
+        
+        # Parse JSON response - handle cases where there might be extra data
+        try:
+            # Try to parse as JSON
+            parsed_response = json.loads(response_text)
+            return json.dumps(parsed_response)
+        except json.JSONDecodeError as e:
+            # If parsing fails, try to extract the first valid JSON object
+            logger.warning(f"JSON parsing error: {e}. Attempting to extract valid JSON from response.")
+            
+            # Try to find the first complete JSON object
+            # Look for the first '{' and try to find matching '}'
+            start_idx = response_text.find('{')
+            if start_idx != -1:
+                # Try to find the matching closing brace
+                brace_count = 0
+                end_idx = start_idx
+                for i in range(start_idx, len(response_text)):
+                    if response_text[i] == '{':
+                        brace_count += 1
+                    elif response_text[i] == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            end_idx = i + 1
+                            break
+                
+                if end_idx > start_idx:
+                    # Extract the JSON substring
+                    json_substring = response_text[start_idx:end_idx]
+                    try:
+                        parsed_response = json.loads(json_substring)
+                        logger.info(f"Successfully extracted JSON from response (char {start_idx} to {end_idx})")
+                        return json.dumps(parsed_response)
+                    except json.JSONDecodeError:
+                        logger.error(f"Failed to parse extracted JSON substring: {json_substring[:200]}...")
+            
+            # If all else fails, return the response as-is (it might already be valid)
+            logger.error(f"Could not parse response as JSON. Returning raw response. Error: {e}")
+            logger.debug(f"Response text (first 500 chars): {response_text[:500]}")
+            # Return as a JSON string containing the raw text
+            return json.dumps({"raw_response": response_text, "parse_error": str(e)})
