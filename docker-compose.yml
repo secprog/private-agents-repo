@@ -28,6 +28,7 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - CYBERSECURITY_AGENT_ENDPOINT=${CYBERSECURITY_AGENT_ENDPOINT}
+      - VISION_AGENT_ENDPOINT=${VISION_AGENT_ENDPOINT}
       - ARTIFACT_SERVICE_TYPE=${ARTIFACT_SERVICE_TYPE}
       - ARTIFACT_ROOT_DIR=${ARTIFACT_ROOT_DIR}
     depends_on:
@@ -59,6 +60,29 @@ services:
       - agent-network
     volumes:
       - ./agents/cybersecurity:/app
+      - ./artifacts:/artifacts
+
+  # Vision Agent (Internal - No External Ports)
+  vision-agent:
+    build: ./agents/vision
+    container_name: ${VISION_CONTAINER:-agent-platform-vision}
+    restart: always
+    ports:
+      - "${VISION_PORT:-8002}:8002"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
+      - ORCHESTRATOR_ENDPOINT=${ORCHESTRATOR_ENDPOINT}
+      - VISION_AGENT_ENDPOINT=${VISION_AGENT_ENDPOINT}
+      - ARTIFACT_SERVICE_TYPE=${ARTIFACT_SERVICE_TYPE}
+      - ARTIFACT_ROOT_DIR=${ARTIFACT_ROOT_DIR}
+    depends_on:
+      - orchestrator
+    networks:
+      - agent-network
+    volumes:
+      - ./agents/vision:/app
       - ./artifacts:/artifacts
 
   # Frontend

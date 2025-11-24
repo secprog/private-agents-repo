@@ -3,61 +3,89 @@ Cybersecurity Agent - Main entry point using ADK SDK
 """
 import os
 import logging
+from google.adk.artifacts import InMemoryArtifactService
 from google.adk.auth.credential_service.in_memory_credential_service import InMemoryCredentialService
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 import uvicorn
+from google.adk.planners import plan_re_act_planner
 from fastapi.middleware.cors import CORSMiddleware
 from google.adk_community.models.openai_llm import OpenAI
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
-from google.adk.artifacts import FileArtifactService
 from modules.architecture_analysis import ArchitectureAnalysis
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
-# Initialize cybersecurity agent
-artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
-# Use postgresql+psycopg:// for async driver (psycopg 3.x)
-db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
-# Convert postgresql:// to postgresql+psycopg:// for async support
-if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
-    db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
+
+# Initialize services
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
 db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
 # Convert postgresql:// to postgresql+psycopg:// for async support
 if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
 session_service = DatabaseSessionService(db_url=db_url)
-architecture_analysis = ArchitectureAnalysis(artifact_service)
-# Create architecture analysis sub-agent
-architecture_sub_agent = Agent(
-    name="architecture_analyzer",
-    description="Specialized sub-agent for analyzing system architecture diagrams",
+
+# Initialize security analyzer (no longer needs artifact service - receives JSON from vision agent)
+architecture_analysis = ArchitectureAnalysis()
+
+# Create security analysis sub-agent
+# This agent receives comprehensive visual analysis from the vision agent
+# and performs security-focused analysis
+security_analyzer_sub_agent = Agent(
+    name="security_analyzer",
+    description="Specialized sub-agent for security analysis of architecture diagrams using comprehensive vision data",
     model=OpenAI(model="gpt-4o"),
-    instruction="Analyze architecture diagrams and extract components, connections, technologies, and security domains, outputs in json format. CRITICAL: You MUST use tools to analyze the architecture, you do not touch the input or output, you only delegate to the tools.",
-    tools=[architecture_analysis.analyze_architecture]
+    instruction="""You are a cybersecurity architecture specialist.
+
+You receive comprehensive visual analysis data from the vision agent including:
+- Visual components, connections, and zones
+- Trust boundaries and security zones
+- Detected technologies and frameworks
+- Inferred relationships and dependencies
+- Annotations and legend mappings
+
+Your task is to perform thorough security analysis:
+1. Identify security threats and vulnerabilities
+2. Analyze potential attack paths
+3. Check compliance with security frameworks
+4. Provide actionable security recommendations
+
+CRITICAL: 
+- You MUST call the analyze_architecture_security tool with ALL available vision data
+- Do not modify the input data
+- Output the complete security analysis in JSON format
+- Prioritize findings by risk level""",
+    tools=[architecture_analysis.analyze_architecture_security],
+    planner=plan_re_act_planner.PlanReActPlanner()
 )
 
-# cybersecurity_architect_sub_agent = Agent(
-#     name="cybersecurity_architect",
-#     description="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments",
-#     model=LiteLlm(model="openai/gpt-4o"),
-#     instruction="Based on the json output of the architecture_analyzer sub-agent, provide cybersecurity recommendations and risk assessments outputs in json format",
-#     tools=[architecture_analyzer.security_analysis]
-# )
 
 # Create A2A server using ADK SDK directly
 root_agent = Agent(
     name=agent_name.replace("-", "_"),
-    description="Specialized agent for cybersecurity including cyber architecture tasks.",
+    description="Specialized agent for cybersecurity architecture analysis and threat assessment.",
     model=OpenAI(model="gpt-4o"),
-    instruction="For cybersecurity including cyber architecture tasks. You delegate to the most appropriate sub-agent. You do not touch sub-agent's input or output, you only delegate to them.",
-    sub_agents=[architecture_sub_agent],
+    instruction="""You are a cybersecurity specialist agent.
+
+Your role is to analyze architecture diagrams for security threats, vulnerabilities, and compliance.
+
+IMPORTANT WORKFLOW:
+1. You receive comprehensive visual analysis data from the vision agent
+2. You delegate security analysis to the security_analyzer sub-agent
+3. The sub-agent returns detailed security findings and recommendations
+
+You do NOT perform visual analysis yourself. You receive structured JSON data from the vision agent and focus on security assessment.
+
+Delegate all security analysis tasks to the security_analyzer sub-agent.
+Do not modify the input or output data.""",
+    sub_agents=[security_analyzer_sub_agent],
+    planner=plan_re_act_planner.PlanReActPlanner()
 )
+
 
 app = to_a2a(
     agent=root_agent,
@@ -67,7 +95,7 @@ app = to_a2a(
     runner=Runner(
         app_name=agent_name,
         agent=root_agent,
-        artifact_service=artifact_service,
+        artifact_service=InMemoryArtifactService(),
         session_service=session_service,
         memory_service=InMemoryMemoryService(),
         credential_service=InMemoryCredentialService(),

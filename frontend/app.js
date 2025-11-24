@@ -1076,7 +1076,7 @@ class AgentPlatform {
 
         // Save a copy of attachments before clearing (needed for both chat display and message sending)
         let attachmentsCopy = [...this.attachments];
-        
+
         // Add user message to chat
         this.addMessageToChat({
             id: this.generateMessageId(),
@@ -1158,7 +1158,7 @@ class AgentPlatform {
                     user_id: this.userId
                 }
             });
-            
+
             // Ensure attachments are cleared after successful send (cleanup)
             this.clearAttachments();
             
@@ -1194,7 +1194,7 @@ class AgentPlatform {
             this.processingSessions.delete(capturedSessionId);
             // Hide typing indicator if this was the current session
             if (capturedSessionId === this.sessionId) {
-                this.hideTypingIndicator();
+        this.hideTypingIndicator();
             }
         }
 
@@ -1855,13 +1855,13 @@ class AgentPlatform {
         
         // Only show indicator if current session is processing
         if (this.processingSessions.has(this.sessionId)) {
-            indicator.style.display = 'flex';
+        indicator.style.display = 'flex';
             this.isTyping = true;
-            
-            // Auto-scroll
-            const container = document.querySelector('.chat-container');
-            container.scrollTop = container.scrollHeight;
-        }
+
+        // Auto-scroll
+        const container = document.querySelector('.chat-container');
+        container.scrollTop = container.scrollHeight;
+    }
     }
 
     hideTypingIndicator(sessionId = null) {
@@ -1869,11 +1869,11 @@ class AgentPlatform {
         
         // Only hide if current session is the target, or if no target specified and current session is not processing
         if (!targetSessionId || targetSessionId === this.sessionId) {
-            const indicator = document.getElementById('typingIndicator');
+        const indicator = document.getElementById('typingIndicator');
             
             // Only hide if current session is not in processing set
             if (!this.processingSessions.has(this.sessionId)) {
-                indicator.style.display = 'none';
+        indicator.style.display = 'none';
                 this.isTyping = false;
             }
         }
@@ -2064,14 +2064,23 @@ class AgentPlatform {
             console.log(`Main skill for ${agentId}:`, mainSkill);
 
             if (mainSkill) {
-                // This is a parent agent - collect all subagent skills
+                // This is a parent agent - collect only skills that belong to THIS agent
+                // Skills can have multiple sub_agent tags (one for sub-agent, one for parent)
                 const allSkills = [...agentSkills];
 
-                // Add skills from detected subagent agents
-                for (const subagentAgentId of subagentAgents) {
-                    const subagentSkills = agentGroups[subagentAgentId] || [];
-                    console.log(`Adding subagent skills from ${subagentAgentId} to ${agentId}:`, subagentSkills);
-                    allSkills.push(...subagentSkills);
+                // Add all skills that have THIS parent agent in their sub_agent tags
+                for (const skill of skills) {
+                    // Skip if already included
+                    if (allSkills.includes(skill)) continue;
+                    
+                    // Check if this skill has a sub_agent tag matching this parent agent
+                    const hasParentTag = skill.tags?.some(tag => 
+                        tag.startsWith('sub_agent:') && tag === `sub_agent:${agentId}`
+                    );
+                    
+                    if (hasParentTag) {
+                        allSkills.push(skill);
+                    }
                 }
 
                 const parentAgent = {
@@ -2088,16 +2097,22 @@ class AgentPlatform {
                 };
 
                 // Group skills by subagent name to collect all tools for each subagent
+                // Skills have format "subagent_name: tool_name" or "subagent_name: model"
                 const subagentGroups = {};
-                const subagentSkills = allSkills.filter(skill =>
-                    skill !== mainSkill &&
-                    skill.name.includes(':') &&
-                    skill.name !== 'model'
-                );
+                const subagentSkills = allSkills.filter(skill => {
+                    // Skip the main skill
+                    if (skill === mainSkill) return false;
+                    
+                    // Only include skills with colon notation (subagent: tool format)
+                    // Exclude "planning" skills as they're not sub-agents
+                    return skill.name.includes(':') && 
+                           skill.name !== 'model' && 
+                           !skill.name.endsWith(': planning');
+                });
 
-                // Group skills by subagent name
+                // Group skills by subagent name (the part before the colon)
                 for (const skill of subagentSkills) {
-                    const subagentName = skill.name.split(':')[0];
+                    const subagentName = skill.name.split(':')[0].trim();
                     if (!subagentGroups[subagentName]) {
                         subagentGroups[subagentName] = [];
                     }

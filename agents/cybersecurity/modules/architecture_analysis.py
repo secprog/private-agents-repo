@@ -1,190 +1,213 @@
 """
-Advanced Architecture Analysis using AI Vision and Multi-modal Processing
+Advanced Architecture Security Analysis
+Analyzes architecture diagrams for security threats, vulnerabilities, and compliance
 """
 
 import logging
 import json
 
-from typing import Dict, Any
+from typing import Optional
 
-# Use the LLM directly for efficient analysis
-from google.adk.artifacts import BaseArtifactService
 from google.adk_community.models.openai_llm import OpenAI
 from google.adk.models.llm_request import LlmRequest
-from google.genai import types
-
-from google.genai.types import Part
-from .prompts import (
-    get_vision_analysis_instructions,
-)
-from .models import VisualAnalysisResponse
+from .prompts import get_comprehensive_security_analysis_instructions
+from .models import ComprehensiveSecurityAnalysis
 
 logger = logging.getLogger(__name__)
-APP_NAME = "orquestrator"
 
 
 class ArchitectureAnalysis:
+    """
+    Security-focused architecture analyzer.
+    Accepts comprehensive visual analysis from vision agent and performs security assessment.
+    """
 
-    def __init__(self, artifact_service: BaseArtifactService):
-        self.artifact_service = artifact_service
-        logger.info(
-            f"ArchitectureAnalyzer initialized with artifact service: {type(artifact_service)}"
-        )
-        if hasattr(artifact_service, "service_type"):
-            logger.info(f"Artifact service type: {artifact_service.service_type}")
-        if hasattr(artifact_service, "artifact_service"):
-            logger.info(
-                f"Underlying artifact service: {type(artifact_service.artifact_service)}"
-            )
+    def __init__(self):
+        logger.info("ArchitectureAnalyzer initialized for security analysis")
 
-    async def analyze_architecture(
-        self, user_id: str, session_id: str, filename: str
+    async def analyze_architecture_security(
+        self,
+        components_json: str,
+        connections_json: str,
+        zones_json: str,
+        trust_boundaries_json: str,
+        technologies_json: str,
+        relationships_json: str,
+        annotations_json: str = "[]",
+        legend_mappings_json: str = "[]",
+        line_crossings_json: str = "[]"
     ) -> str:
-        """Comprehensive architecture analysis using AI vision and security expertise"""
-        try:
-            logger.info(
-                f"Starting architecture analysis for session_id={session_id}, filename={filename}"
-            )
-
-            # Load artifact using artifact_service directly
-            logger.info(
-                f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-            )
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                logger.error(f"Could not load artifact")
-                logger.error(
-                    f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-                )
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
-            logger.info(
-                f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"
-            )
-
-            visual_analysis = await self._perform_visual_analysis(part, filename)
-            return json.dumps(visual_analysis)
-
-        except Exception as e:
-            logger.error(f"Failed to analyze architecture: {e}")
-            raise
-
-    async def _perform_visual_analysis(self, part: Part, filename: str) -> Dict[str, Any]:
-
-        visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
-        For the file "{filename}", provide a comprehensive visual analysis in json format."""
-
-        llm = OpenAI(model="gpt-4o")
-        # Use Pydantic model for visual analysis response schema
-        visual_schema = VisualAnalysisResponse
-
-        # Create LlmRequest (ADK's request object)
-        llm_request = LlmRequest(
-            model=llm.model,
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_text(text=visual_prompt),
-                        part,  # The image part
-                    ],
-                )
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=get_vision_analysis_instructions(),
-                temperature=0.1,
-                max_output_tokens=16384,
-                response_mime_type="application/json",
-            ),
-        )
-
-        # Set output schema using the method (handles structured output properly)
-        llm_request.set_output_schema(visual_schema)
-        # Call the LLM - this returns an async generator
-        response_text = ""
-        finish_reason = None
-        response_count = 0
-        async for llm_response in llm.generate_content_async(llm_request, stream=False):
-            response_count += 1
-            if llm_response.content and llm_response.content.parts:
-                # Collect all text parts in case there are multiple
-                text_parts = []
-                for part in llm_response.content.parts:
-                    if hasattr(part, "text") and part.text:
-                        text_parts.append(part.text)
-                if text_parts:
-                    response_text += "".join(text_parts)  # Accumulate, don't replace
-
-            # Check finish reason to detect truncation (update from last response)
-            if hasattr(llm_response, "finish_reason"):
-                finish_reason = llm_response.finish_reason
-            elif hasattr(llm_response, "candidates") and llm_response.candidates:
-                if hasattr(llm_response.candidates[0], "finish_reason"):
-                    finish_reason = llm_response.candidates[0].finish_reason
-
-        if not response_text:
-            logger.error("Empty response from LLM")
-            raise ValueError("Empty response from LLM - no text content received")
-
-        # Check if response was truncated
-        if finish_reason and finish_reason in [
-            "MAX_TOKENS",
-            "LENGTH",
-            "MAX_OUTPUT_TOKENS",
-        ]:
-            logger.warning(f"Response may be truncated. Finish reason: {finish_reason}")
-            logger.warning(f"Response length: {len(response_text)} characters")
-
-        logger.debug(
-            f"Collected {response_count} responses, total length: {len(response_text)}, finish_reason: {finish_reason}"
-        )
+        """
+        Comprehensive security analysis of architecture using rich vision data.
         
-        # Parse JSON response - handle cases where there might be extra data
+        Args:
+            components_json: Visual components from vision agent
+            connections_json: Visual connections from vision agent
+            zones_json: Visual zones from vision agent
+            trust_boundaries_json: Trust boundaries from vision agent
+            technologies_json: Detected technologies from vision agent
+            relationships_json: Inferred relationships from vision agent
+            annotations_json: Optional annotations from vision agent
+            legend_mappings_json: Optional legend mappings from vision agent
+            line_crossings_json: Optional line crossings from vision agent
+            
+        Returns:
+            JSON string containing ComprehensiveSecurityAnalysis
+        """
         try:
-            # Try to parse as JSON
-            parsed_response = json.loads(response_text)
-            return json.dumps(parsed_response)
-        except json.JSONDecodeError as e:
-            # If parsing fails, try to extract the first valid JSON object
-            logger.warning(f"JSON parsing error: {e}. Attempting to extract valid JSON from response.")
+            logger.info("Starting comprehensive security analysis")
             
-            # Try to find the first complete JSON object
-            # Look for the first '{' and try to find matching '}'
-            start_idx = response_text.find('{')
-            if start_idx != -1:
-                # Try to find the matching closing brace
-                brace_count = 0
-                end_idx = start_idx
-                for i in range(start_idx, len(response_text)):
-                    if response_text[i] == '{':
-                        brace_count += 1
-                    elif response_text[i] == '}':
-                        brace_count -= 1
-                        if brace_count == 0:
-                            end_idx = i + 1
-                            break
+            # Validate inputs
+            self._validate_json_input("components", components_json)
+            self._validate_json_input("connections", connections_json)
+            self._validate_json_input("zones", zones_json)
+            self._validate_json_input("trust_boundaries", trust_boundaries_json)
+            self._validate_json_input("technologies", technologies_json)
+            self._validate_json_input("relationships", relationships_json)
+            
+            # Build comprehensive context for LLM
+            context = self._build_analysis_context(
+                components_json,
+                connections_json,
+                zones_json,
+                trust_boundaries_json,
+                technologies_json,
+                relationships_json,
+                annotations_json,
+                legend_mappings_json,
+                line_crossings_json
+            )
+            
+            logger.info(f"Analysis context built: {len(context)} characters")
+            
+            # Perform security analysis using LLM
+            llm_request = LlmRequest()
+            llm_request.add_text_part(context)
+            llm_request.system_instruction = get_comprehensive_security_analysis_instructions()
+            llm_request.set_output_schema(ComprehensiveSecurityAnalysis)
+            
+            logger.info("Calling LLM for security analysis")
+            
+            llm = OpenAI(model="gpt-4o")
+            response = await llm.generate_content_async(llm_request)
+            
+            # Extract and parse response
+            if not response or not response.text:
+                raise ValueError("Empty response from LLM")
+            
+            # Parse and validate JSON
+            try:
+                security_analysis = json.loads(response.text)
+                logger.info(
+                    f"Security analysis complete: "
+                    f"{len(security_analysis.get('threats', []))} threats, "
+                    f"{len(security_analysis.get('vulnerabilities', []))} vulnerabilities, "
+                    f"{len(security_analysis.get('attack_paths', []))} attack paths, "
+                    f"{len(security_analysis.get('recommendations', []))} recommendations"
+                )
+                return response.text
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse LLM response as JSON: {e}")
+                logger.error(f"Response text: {response.text[:500]}...")
+                raise
                 
-                if end_idx > start_idx:
-                    # Extract the JSON substring
-                    json_substring = response_text[start_idx:end_idx]
-                    try:
-                        parsed_response = json.loads(json_substring)
-                        logger.info(f"Successfully extracted JSON from response (char {start_idx} to {end_idx})")
-                        return json.dumps(parsed_response)
-                    except json.JSONDecodeError:
-                        logger.error(f"Failed to parse extracted JSON substring: {json_substring[:200]}...")
-            
-            # If all else fails, return the response as-is (it might already be valid)
-            logger.error(f"Could not parse response as JSON. Returning raw response. Error: {e}")
-            logger.debug(f"Response text (first 500 chars): {response_text[:500]}")
-            # Return as a JSON string containing the raw text
-            return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+        except Exception as e:
+            logger.error(f"Failed to analyze architecture security: {e}")
+            raise
+    
+    def _validate_json_input(self, name: str, json_str: str) -> None:
+        """Validate that input is valid JSON"""
+        try:
+            json.loads(json_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON for {name}: {e}")
+            raise ValueError(f"Invalid JSON input for {name}: {e}")
+    
+    def _build_analysis_context(
+        self,
+        components_json: str,
+        connections_json: str,
+        zones_json: str,
+        trust_boundaries_json: str,
+        technologies_json: str,
+        relationships_json: str,
+        annotations_json: str,
+        legend_mappings_json: str,
+        line_crossings_json: str
+    ) -> str:
+        """Build comprehensive context string for LLM analysis"""
+        
+        context = """# Architecture Security Analysis Request
+
+Please analyze the following architecture data and provide a comprehensive security assessment.
+
+## Visual Components
+Components in the architecture (servers, databases, APIs, etc.):
+```json
+{components}
+```
+
+## Visual Connections
+Connections and data flows between components:
+```json
+{connections}
+```
+
+## Visual Zones
+Logical zones and regions in the architecture:
+```json
+{zones}
+```
+
+## Trust Boundaries
+Security and trust boundaries (DMZ, VPC, network segments):
+```json
+{trust_boundaries}
+```
+
+## Detected Technologies
+Technologies, frameworks, and cloud services identified:
+```json
+{technologies}
+```
+
+## Inferred Relationships
+Logical relationships and dependencies not explicitly shown:
+```json
+{relationships}
+```
+
+## Annotations (if available)
+Text annotations, notes, and warnings:
+```json
+{annotations}
+```
+
+## Legend Mappings (if available)
+Symbol-to-meaning mappings from diagram legend:
+```json
+{legend_mappings}
+```
+
+## Line Crossings (if available)
+Network topology and line crossing analysis:
+```json
+{line_crossings}
+```
+
+---
+
+Based on this comprehensive data, perform a thorough security analysis and identify threats, vulnerabilities, attack paths, compliance issues, and provide actionable recommendations.
+"""
+        
+        return context.format(
+            components=components_json,
+            connections=connections_json,
+            zones=zones_json,
+            trust_boundaries=trust_boundaries_json,
+            technologies=technologies_json,
+            relationships=relationships_json,
+            annotations=annotations_json,
+            legend_mappings=legend_mappings_json,
+            line_crossings=line_crossings_json
+        )
