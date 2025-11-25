@@ -6,6 +6,7 @@ import logging
 import json
 import os
 import asyncio
+import re
 
 
 from google.adk.artifacts import BaseArtifactService
@@ -89,7 +90,7 @@ class VisionAnalysis:
         visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
         For the file "{filename}", provide a comprehensive visual analysis in json format."""
 
-        llm = OpenAI(model="gpt-5.1-mini")
+        llm = OpenAI(model="gpt-5-mini")
 
         # Create LlmRequest (ADK's request object)
         llm_request = LlmRequest(
@@ -105,7 +106,6 @@ class VisionAnalysis:
             ],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                temperature=0.1,
                 max_output_tokens=16384,
                 response_mime_type="application/json",
             ),
@@ -119,6 +119,13 @@ class VisionAnalysis:
         response_count = 0
         async for llm_response in llm.generate_content_async(llm_request, stream=False):
             response_count += 1
+            error_message = getattr(llm_response, "error_message", None)
+            if error_message:
+                error_code = getattr(llm_response, "error_code", None)
+                error_prefix = f"{error_code}: " if error_code else ""
+                full_error = f"{error_prefix}{error_message}"
+                logger.error(f"LLM returned error: {full_error}")
+                raise ValueError(full_error)
             if llm_response.content and llm_response.content.parts:
                 # Collect all text parts in case there are multiple
                 text_parts = []
@@ -463,7 +470,7 @@ Zones:
 
 Analyze these results and identify issues, inconsistencies, and areas for improvement."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -541,7 +548,7 @@ Connections:
 
 Infer relationships that are logically implied but not explicitly shown."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -715,7 +722,7 @@ Infer relationships that are logically implied but not explicitly shown."""
 
 Identify all differences, similarities, and changes."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -791,7 +798,7 @@ Initial Analysis:
 
 Improve the analysis by correcting errors, filling gaps, and improving confidence scores."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1045,7 +1052,7 @@ Zones:
 
 Generate PlantUML code that represents this architecture diagram."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1126,7 +1133,7 @@ Zones:
 
 Generate Mermaid code that represents this architecture diagram."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1510,7 +1517,7 @@ Known Connections:
 
 Identify where lines cross and determine if they actually connect or just visually overlap."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1591,7 +1598,7 @@ Identify all security zones, network boundaries, and trust perimeters."""
 
 Analyze the diagram to find security zones, network boundaries, and trust perimeters."""
 
-            llm = OpenAI(model="gpt-5.1-mini")
+            llm = OpenAI(model="gpt-5-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
