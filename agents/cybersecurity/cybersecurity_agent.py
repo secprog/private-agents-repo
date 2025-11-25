@@ -38,7 +38,7 @@ architecture_analysis = ArchitectureAnalysis()
 security_analyzer_sub_agent = Agent(
     name="security_analyzer",
     description="Specialized sub-agent for security analysis of architecture diagrams using comprehensive vision data",
-    model=OpenAI(model="gpt-4o"),
+    model=OpenAI(model="gpt-5.1"),
     instruction="""You are a cybersecurity architecture specialist.
 
 You receive comprehensive visual analysis data from the vision agent including:
@@ -68,7 +68,7 @@ CRITICAL:
 root_agent = Agent(
     name=agent_name.replace("-", "_"),
     description="Specialized agent for cybersecurity architecture analysis and threat assessment.",
-    model=OpenAI(model="gpt-4o"),
+    model=OpenAI(model="gpt-5.1"),
     instruction="""You are a cybersecurity specialist agent.
 
 Your role is to analyze architecture diagrams for security threats, vulnerabilities, and compliance.

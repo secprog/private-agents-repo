@@ -89,7 +89,7 @@ class VisionAnalysis:
         visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
         For the file "{filename}", provide a comprehensive visual analysis in json format."""
 
-        llm = OpenAI(model="gpt-4o")
+        llm = OpenAI(model="gpt-5.1-mini")
 
         # Create LlmRequest (ADK's request object)
         llm_request = LlmRequest(
@@ -463,7 +463,7 @@ Zones:
 
 Analyze these results and identify issues, inconsistencies, and areas for improvement."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -541,7 +541,7 @@ Connections:
 
 Infer relationships that are logically implied but not explicitly shown."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -715,7 +715,7 @@ Infer relationships that are logically implied but not explicitly shown."""
 
 Identify all differences, similarities, and changes."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -791,7 +791,7 @@ Initial Analysis:
 
 Improve the analysis by correcting errors, filling gaps, and improving confidence scores."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -839,7 +839,7 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
     async def extract_text_with_paddleocr(
         self, user_id: str, session_id: str, filename: str
     ) -> str:
-        """Extract text using PaddleOCR (more accurate than GPT-4o for text)"""
+        """Extract text using PaddleOCR (more accurate than GPT for text)"""
         try:
             logger.info(
                 f"Starting PaddleOCR text extraction for session_id={session_id}, filename={filename}"
@@ -860,8 +860,8 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 # This is a placeholder for MCP tool integration
                 # In production, this would use the MCP client to call the PaddleOCR tool
                 
-                # For now, we'll fall back to GPT-4o OCR
-                logger.warning("PaddleOCR MCP integration pending - falling back to GPT-4o")
+                # For now, we'll fall back to GPT OCR
+                logger.warning("PaddleOCR MCP integration pending - falling back to GPT")
                 return await self.extract_text_from_image(user_id, session_id, filename)
                 
                 # TODO: Implement proper MCP tool call like:
@@ -917,7 +917,7 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 return json.dumps(text_results)
                 
             except Exception as e:
-                logger.warning(f"PaddleOCR MCP error: {e}, falling back to GPT-4o")
+                logger.warning(f"PaddleOCR MCP error: {e}, falling back to GPT")
                 return await self.extract_text_from_image(user_id, session_id, filename)
 
         except Exception as e:
@@ -927,7 +927,7 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
     async def extract_text_with_consensus(
         self, user_id: str, session_id: str, filename: str
     ) -> str:
-        """Use both GPT-4o and PaddleOCR, merge results with confidence scoring"""
+        """Use both GPT and PaddleOCR, merge results with confidence scoring"""
         try:
             logger.info(
                 f"Starting consensus text extraction for session_id={session_id}, filename={filename}"
@@ -944,13 +944,13 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
             
             # Handle if one or both failed
             if isinstance(gpt4o_result, Exception) and isinstance(paddleocr_result, Exception):
-                logger.error(f"Both extraction methods failed: GPT-4o: {gpt4o_result}, PaddleOCR: {paddleocr_result}")
+                logger.error(f"Both extraction methods failed: GPT: {gpt4o_result}, PaddleOCR: {paddleocr_result}")
                 raise Exception(f"All text extraction methods failed: {gpt4o_result}")
             elif isinstance(gpt4o_result, Exception):
-                logger.warning(f"GPT-4o extraction failed: {gpt4o_result}, using PaddleOCR only")
+                logger.warning(f"GPT extraction failed: {gpt4o_result}, using PaddleOCR only")
                 return paddleocr_result
             elif isinstance(paddleocr_result, Exception):
-                logger.warning(f"PaddleOCR extraction failed: {paddleocr_result}, using GPT-4o only")
+                logger.warning(f"PaddleOCR extraction failed: {paddleocr_result}, using GPT only")
                 return gpt4o_result
 
             # Parse results
@@ -1045,7 +1045,7 @@ Zones:
 
 Generate PlantUML code that represents this architecture diagram."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1126,7 +1126,7 @@ Zones:
 
 Generate Mermaid code that represents this architecture diagram."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1208,7 +1208,7 @@ Zones:
 Generate draw.io (diagrams.net) XML code that represents this architecture diagram.
 Use proper mxGraph XML format with accurate positioning and appropriate styles."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1510,7 +1510,7 @@ Known Connections:
 
 Identify where lines cross and determine if they actually connect or just visually overlap."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[
@@ -1591,7 +1591,7 @@ Identify all security zones, network boundaries, and trust perimeters."""
 
 Analyze the diagram to find security zones, network boundaries, and trust perimeters."""
 
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1-mini")
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[

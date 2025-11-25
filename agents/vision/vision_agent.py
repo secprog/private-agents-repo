@@ -36,7 +36,7 @@ vision_analysis = VisionAnalysis(artifact_service)
 visual_analysis_agent = Agent(
     name="visual_analyzer",
     description="Specialized agent for analyzing visual elements from images with advanced capabilities",
-    model=OpenAI(model="gpt-4o"),
+    model=OpenAI(model="gpt-5.1"),
     instruction="""You are an advanced visual analysis agent specialized in analyzing architecture diagrams and images.
 
 You have multiple tools available for comprehensive analysis:
@@ -47,9 +47,9 @@ CORE ANALYSIS TOOLS (call in parallel for complete analysis):
 3. analyze_visual_zones - Extracts visual zones (regions, boundaries, etc.)
 
 OCR & TEXT EXTRACTION (accurate text recognition):
-4. extract_text_from_image - Extracts text using GPT-4o
+4. extract_text_from_image - Extracts text using GPT
 5. extract_text_with_paddleocr - Extracts text using PaddleOCR (more accurate)
-6. extract_text_with_consensus - Uses both GPT-4o and PaddleOCR for best results
+6. extract_text_with_consensus - Uses both GPT and PaddleOCR for best results
 
 ENHANCEMENT TOOLS:
 7. detect_technologies - Identifies technologies, cloud services, frameworks
@@ -151,7 +151,7 @@ COMPLEX DIAGRAM WORKFLOW:
 merger = Agent(
     name="merge_visual_analysis",
     description="Specialized sub-agent for merging visual analysis results into unified representation",
-    model=OpenAI(model="gpt-4o"),
+    model=OpenAI(model="gpt-5.1"),
     instruction=get_merger_instructions(),
 )
 
@@ -159,7 +159,7 @@ merger = Agent(
 root_agent = Agent(
     name=agent_name.replace("-", "_"),
     description="Specialized agent for visual analysis of architecture diagrams and images.",
-    model=OpenAI(model="gpt-4o"),
+    model=OpenAI(model="gpt-5.1"),
     instruction="""For visual analysis tasks, you have two sub-agents:
 1. visual_analyzer - Performs visual analysis using tools (components, connections, zones)
 2. merge_visual_analysis - Merges visual analysis results into unified representation

@@ -88,7 +88,7 @@ class ArchitectureAnalysis:
             
             logger.info("Calling LLM for security analysis")
             
-            llm = OpenAI(model="gpt-4o")
+            llm = OpenAI(model="gpt-5.1")
             response = await llm.generate_content_async(llm_request)
             
             # Extract and parse response

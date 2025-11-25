@@ -1,6 +1,6 @@
 # Vision Agent
 
-Advanced visual analysis agent for architecture diagrams and images using GPT-4o Vision and multi-tool analysis.
+Advanced visual analysis agent for architecture diagrams and images using GPT Vision and multi-tool analysis.
 
 ## Features
 
@@ -10,8 +10,8 @@ Advanced visual analysis agent for architecture diagrams and images using GPT-4o
 - **Visual Zones** - Extract zones (regions, boundaries, etc.)
 
 ### OCR & Text Extraction (3 tools)
-- **GPT-4o OCR** - Standard text extraction
-- **PaddleOCR** - High-accuracy dedicated OCR (fallback to GPT-4o)
+- **GPT OCR** - Standard text extraction
+- **PaddleOCR** - High-accuracy dedicated OCR (fallback to GPT)
 - **Consensus Extraction** - Combines both for best results
 
 ### Enhancement Tools (3 tools)
@@ -122,7 +122,7 @@ python vision_agent.py
 See `.env.example` for all configuration options.
 
 ### Required
-- `OPENAI_API_KEY` - Your OpenAI API key for GPT-4o
+- `OPENAI_API_KEY` - Your OpenAI API key for GPT
 - `DATABASE_URL` - PostgreSQL connection string
 
 ### Optional
