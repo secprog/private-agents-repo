@@ -98,7 +98,7 @@ class RAGTools:
                     model=self.model_name,
                     contents=[content],
                     config=types.GenerateContentConfig(
-                        temperature=0.1, max_output_tokens=1000
+     max_output_tokens=1000
                     ),
                 )
 

@@ -84,7 +84,11 @@ class VisionAnalysis:
             )
 
     async def _perform_visual_analysis(
-        self, part: Part, filename: str, visual_schema: BaseModel, system_instruction: str
+        self,
+        part: Part,
+        filename: str,
+        visual_schema: BaseModel,
+        system_instruction: str,
     ) -> str:
         """Perform visual analysis using LLM with structured output"""
         visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
@@ -394,7 +398,10 @@ class VisionAnalysis:
                 )
 
             result = await self._perform_visual_analysis(
-                part, filename, TechnologyDetection, get_technology_detection_instructions()
+                part,
+                filename,
+                TechnologyDetection,
+                get_technology_detection_instructions(),
             )
             return result
 
@@ -425,7 +432,10 @@ class VisionAnalysis:
                 )
 
             result = await self._perform_visual_analysis(
-                part, filename, DiagramClassification, get_diagram_classification_instructions()
+                part,
+                filename,
+                DiagramClassification,
+                get_diagram_classification_instructions(),
             )
             return result
 
@@ -434,8 +444,13 @@ class VisionAnalysis:
             raise
 
     async def validate_visual_analysis(
-        self, user_id: str, session_id: str, filename: str,
-        components_json: str, connections_json: str, zones_json: str
+        self,
+        user_id: str,
+        session_id: str,
+        filename: str,
+        components_json: str,
+        connections_json: str,
+        zones_json: str,
     ) -> str:
         """Validate and check quality of visual analysis results"""
         try:
@@ -484,7 +499,6 @@ Analyze these results and identify issues, inconsistencies, and areas for improv
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_validation_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -492,10 +506,13 @@ Analyze these results and identify issues, inconsistencies, and areas for improv
 
             llm_request.set_output_schema(ValidationResult)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -509,15 +526,21 @@ Analyze these results and identify issues, inconsistencies, and areas for improv
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse validation response: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to validate analysis: {e}")
             raise
 
     async def infer_relationships(
-        self, user_id: str, session_id: str, filename: str,
-        components_json: str, connections_json: str
+        self,
+        user_id: str,
+        session_id: str,
+        filename: str,
+        components_json: str,
+        connections_json: str,
     ) -> str:
         """Infer logical relationships not explicitly shown visually"""
         try:
@@ -562,7 +585,6 @@ Infer relationships that are logically implied but not explicitly shown."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_relationship_inference_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -570,10 +592,13 @@ Infer relationships that are logically implied but not explicitly shown."""
 
             llm_request.set_output_schema(InferredRelationship)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -587,15 +612,15 @@ Infer relationships that are logically implied but not explicitly shown."""
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse inference response: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to infer relationships: {e}")
             raise
 
-    async def analyze_layout(
-        self, user_id: str, session_id: str, filename: str
-    ) -> str:
+    async def analyze_layout(self, user_id: str, session_id: str, filename: str) -> str:
         """Analyze diagram layout, hierarchy, and structure"""
         try:
             logger.info(
@@ -738,7 +763,6 @@ Identify all differences, similarities, and changes."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_diagram_comparison_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -746,10 +770,13 @@ Identify all differences, similarities, and changes."""
 
             llm_request.set_output_schema(DiagramComparison)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -763,7 +790,9 @@ Identify all differences, similarities, and changes."""
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse comparison response: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to compare diagrams: {e}")
@@ -812,7 +841,6 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_enhancement_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -820,10 +848,13 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
 
             llm_request.set_output_schema(EnhancedAnalysis)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -837,7 +868,9 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse enhancement response: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to enhance analysis: {e}")
@@ -866,25 +899,31 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 # Note: PaddleOCR is accessed via MCP protocol, not direct import
                 # This is a placeholder for MCP tool integration
                 # In production, this would use the MCP client to call the PaddleOCR tool
-                
+
                 # For now, we'll fall back to GPT OCR
-                logger.warning("PaddleOCR MCP integration pending - falling back to GPT")
+                logger.warning(
+                    "PaddleOCR MCP integration pending - falling back to GPT"
+                )
                 return await self.extract_text_from_image(user_id, session_id, filename)
-                
+
                 # TODO: Implement proper MCP tool call like:
                 # from mcp_client import call_tool
-                # ocr_result = await call_tool("paddleocr", "ocr", 
+                # ocr_result = await call_tool("paddleocr", "ocr",
                 #                              input_data=file_path, output_mode="detailed")
-                
+
                 # Convert PaddleOCR result to our format
-                
+
                 text_results = []
                 if isinstance(ocr_result, str):
                     # Parse the result if it's a string
-                    ocr_data = json.loads(ocr_result) if ocr_result.startswith('{') or ocr_result.startswith('[') else {"text": ocr_result}
+                    ocr_data = (
+                        json.loads(ocr_result)
+                        if ocr_result.startswith("{") or ocr_result.startswith("[")
+                        else {"text": ocr_result}
+                    )
                 else:
                     ocr_data = ocr_result
-                
+
                 # Extract text from PaddleOCR format
                 if isinstance(ocr_data, list):
                     for item in ocr_data:
@@ -892,37 +931,43 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                             bbox = item.get("box", [[0, 0], [0, 0], [0, 0], [0, 0]])
                             x_coords = [p[0] for p in bbox]
                             y_coords = [p[1] for p in bbox]
-                            
-                            text_results.append({
-                                "text": item["text"],
-                                "position": {
-                                    "x": min(x_coords),
-                                    "y": min(y_coords),
-                                    "width": max(x_coords) - min(x_coords),
-                                    "height": max(y_coords) - min(y_coords)
-                                },
-                                "confidence": item.get("confidence", 1.0),
-                                "source": "paddleocr"
-                            })
+
+                            text_results.append(
+                                {
+                                    "text": item["text"],
+                                    "position": {
+                                        "x": min(x_coords),
+                                        "y": min(y_coords),
+                                        "width": max(x_coords) - min(x_coords),
+                                        "height": max(y_coords) - min(y_coords),
+                                    },
+                                    "confidence": item.get("confidence", 1.0),
+                                    "source": "paddleocr",
+                                }
+                            )
                 elif isinstance(ocr_data, dict) and "text" in ocr_data:
-                    text_results.append({
-                        "text": ocr_data["text"],
-                        "position": {"x": 0, "y": 0, "width": 0, "height": 0},
-                        "confidence": ocr_data.get("confidence", 1.0),
-                        "source": "paddleocr"
-                    })
+                    text_results.append(
+                        {
+                            "text": ocr_data["text"],
+                            "position": {"x": 0, "y": 0, "width": 0, "height": 0},
+                            "confidence": ocr_data.get("confidence", 1.0),
+                            "source": "paddleocr",
+                        }
+                    )
                 elif isinstance(ocr_data, str):
-                    text_results.append({
-                        "text": ocr_data,
-                        "position": {"x": 0, "y": 0, "width": 0, "height": 0},
-                        "confidence": 1.0,
-                        "source": "paddleocr"
-                    })
-                
+                    text_results.append(
+                        {
+                            "text": ocr_data,
+                            "position": {"x": 0, "y": 0, "width": 0, "height": 0},
+                            "confidence": 1.0,
+                            "source": "paddleocr",
+                        }
+                    )
+
                 # This code is unreachable due to early return above
                 # Keeping structure for when MCP integration is completed
                 return json.dumps(text_results)
-                
+
             except Exception as e:
                 logger.warning(f"PaddleOCR MCP error: {e}, falling back to GPT")
                 return await self.extract_text_from_image(user_id, session_id, filename)
@@ -942,44 +987,59 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
 
             # Run both methods (they can run in parallel conceptually, but we'll do sequential for simplicity)
             gpt4o_task = self.extract_text_from_image(user_id, session_id, filename)
-            paddleocr_task = self.extract_text_with_paddleocr(user_id, session_id, filename)
-            
+            paddleocr_task = self.extract_text_with_paddleocr(
+                user_id, session_id, filename
+            )
+
             # Gather both results, capturing exceptions
             gpt4o_result, paddleocr_result = await asyncio.gather(
                 gpt4o_task, paddleocr_task, return_exceptions=True
             )
-            
+
             # Handle if one or both failed
-            if isinstance(gpt4o_result, Exception) and isinstance(paddleocr_result, Exception):
-                logger.error(f"Both extraction methods failed: GPT: {gpt4o_result}, PaddleOCR: {paddleocr_result}")
+            if isinstance(gpt4o_result, Exception) and isinstance(
+                paddleocr_result, Exception
+            ):
+                logger.error(
+                    f"Both extraction methods failed: GPT: {gpt4o_result}, PaddleOCR: {paddleocr_result}"
+                )
                 raise Exception(f"All text extraction methods failed: {gpt4o_result}")
             elif isinstance(gpt4o_result, Exception):
-                logger.warning(f"GPT extraction failed: {gpt4o_result}, using PaddleOCR only")
+                logger.warning(
+                    f"GPT extraction failed: {gpt4o_result}, using PaddleOCR only"
+                )
                 return paddleocr_result
             elif isinstance(paddleocr_result, Exception):
-                logger.warning(f"PaddleOCR extraction failed: {paddleocr_result}, using GPT only")
+                logger.warning(
+                    f"PaddleOCR extraction failed: {paddleocr_result}, using GPT only"
+                )
                 return gpt4o_result
 
             # Parse results
-            gpt4o_texts = json.loads(gpt4o_result) if isinstance(gpt4o_result, str) else gpt4o_result
-            paddleocr_texts = json.loads(paddleocr_result) if isinstance(paddleocr_result, str) else paddleocr_result
+            gpt4o_texts = (
+                json.loads(gpt4o_result)
+                if isinstance(gpt4o_result, str)
+                else gpt4o_result
+            )
+            paddleocr_texts = (
+                json.loads(paddleocr_result)
+                if isinstance(paddleocr_result, str)
+                else paddleocr_result
+            )
 
             # Merge results with consensus logic
             merged_texts = []
             conflicts = []
-            
+
             # Simple merge: take all unique texts, prefer higher confidence
             text_map = {}
-            
-            for item in (gpt4o_texts if isinstance(gpt4o_texts, list) else []):
+
+            for item in gpt4o_texts if isinstance(gpt4o_texts, list) else []:
                 text = item.get("text", "").strip()
                 if text:
-                    text_map[text] = {
-                        **item,
-                        "source": "gpt4o"
-                    }
-            
-            for item in (paddleocr_texts if isinstance(paddleocr_texts, list) else []):
+                    text_map[text] = {**item, "source": "gpt4o"}
+
+            for item in paddleocr_texts if isinstance(paddleocr_texts, list) else []:
                 text = item.get("text", "").strip()
                 if text:
                     if text in text_map:
@@ -987,29 +1047,27 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                         existing = text_map[text]
                         new_conf = item.get("confidence", 0.5)
                         old_conf = existing.get("confidence", 0.5)
-                        
+
                         if new_conf > old_conf:
-                            text_map[text] = {
-                                **item,
-                                "source": "consensus"
-                            }
+                            text_map[text] = {**item, "source": "consensus"}
                         else:
                             text_map[text]["source"] = "consensus"
                     else:
-                        text_map[text] = {
-                            **item,
-                            "source": "paddleocr"
-                        }
-            
+                        text_map[text] = {**item, "source": "paddleocr"}
+
             merged_texts = list(text_map.values())
-            overall_confidence = sum(t.get("confidence", 0.5) for t in merged_texts) / len(merged_texts) if merged_texts else 0.0
-            
+            overall_confidence = (
+                sum(t.get("confidence", 0.5) for t in merged_texts) / len(merged_texts)
+                if merged_texts
+                else 0.0
+            )
+
             result = {
                 "texts": merged_texts,
                 "conflicts": conflicts,
-                "overall_confidence": overall_confidence
+                "overall_confidence": overall_confidence,
             }
-            
+
             return json.dumps(result)
 
         except Exception as e:
@@ -1017,8 +1075,13 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
             raise
 
     async def export_to_plantuml(
-        self, user_id: str, session_id: str, filename: str,
-        components_json: str, connections_json: str, zones_json: str
+        self,
+        user_id: str,
+        session_id: str,
+        filename: str,
+        components_json: str,
+        connections_json: str,
+        zones_json: str,
     ) -> str:
         """Convert visual analysis to PlantUML diagram code"""
         try:
@@ -1066,7 +1129,6 @@ Generate PlantUML code that represents this architecture diagram."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_plantuml_export_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -1074,10 +1136,13 @@ Generate PlantUML code that represents this architecture diagram."""
 
             llm_request.set_output_schema(PlantUMLExport)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -1091,15 +1156,22 @@ Generate PlantUML code that represents this architecture diagram."""
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse PlantUML export: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to export to PlantUML: {e}")
             raise
 
     async def export_to_mermaid(
-        self, user_id: str, session_id: str, filename: str,
-        components_json: str, connections_json: str, zones_json: str
+        self,
+        user_id: str,
+        session_id: str,
+        filename: str,
+        components_json: str,
+        connections_json: str,
+        zones_json: str,
     ) -> str:
         """Convert visual analysis to Mermaid diagram code"""
         try:
@@ -1147,7 +1219,6 @@ Generate Mermaid code that represents this architecture diagram."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_mermaid_export_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -1155,10 +1226,13 @@ Generate Mermaid code that represents this architecture diagram."""
 
             llm_request.set_output_schema(MermaidExport)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -1172,15 +1246,22 @@ Generate Mermaid code that represents this architecture diagram."""
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse Mermaid export: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to export to Mermaid: {e}")
             raise
 
     async def export_to_drawio(
-        self, user_id: str, session_id: str, filename: str,
-        components_json: str, connections_json: str, zones_json: str
+        self,
+        user_id: str,
+        session_id: str,
+        filename: str,
+        components_json: str,
+        connections_json: str,
+        zones_json: str,
     ) -> str:
         """Convert visual analysis to draw.io XML format"""
         try:
@@ -1229,7 +1310,6 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_drawio_export_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -1237,10 +1317,13 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
 
             llm_request.set_output_schema(DrawIOExport)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -1254,7 +1337,9 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse draw.io export: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to export to draw.io: {e}")
@@ -1283,7 +1368,10 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 )
 
             result = await self._perform_visual_analysis(
-                part, filename, ImageQualityAssessment, get_image_quality_assessment_instructions()
+                part,
+                filename,
+                ImageQualityAssessment,
+                get_image_quality_assessment_instructions(),
             )
             return result
 
@@ -1344,11 +1432,17 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
             # 2. Analyze each region separately
             # 3. Merge the results
 
-            logger.info(f"Identified {len(regions)} regions, performing comprehensive analysis")
+            logger.info(
+                f"Identified {len(regions)} regions, performing comprehensive analysis"
+            )
 
             # Analyze all regions in parallel (simplified: analyze whole image)
-            components_task = self.analyze_visual_components(user_id, session_id, filename)
-            connections_task = self.analyze_visual_connections(user_id, session_id, filename)
+            components_task = self.analyze_visual_components(
+                user_id, session_id, filename
+            )
+            connections_task = self.analyze_visual_connections(
+                user_id, session_id, filename
+            )
             zones_task = self.analyze_visual_zones(user_id, session_id, filename)
 
             components_json, connections_json, zones_json = await asyncio.gather(
@@ -1360,7 +1454,7 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 "merged_components": json.loads(components_json),
                 "merged_connections": json.loads(connections_json),
                 "merged_zones": json.loads(zones_json),
-                "overall_quality": 0.85  # Placeholder
+                "overall_quality": 0.85,  # Placeholder
             }
 
             return json.dumps(result)
@@ -1383,8 +1477,12 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
             iteration = 1
 
             # Initial comprehensive analysis
-            components_task = self.analyze_visual_components(user_id, session_id, filename)
-            connections_task = self.analyze_visual_connections(user_id, session_id, filename)
+            components_task = self.analyze_visual_components(
+                user_id, session_id, filename
+            )
+            connections_task = self.analyze_visual_connections(
+                user_id, session_id, filename
+            )
             zones_task = self.analyze_visual_zones(user_id, session_id, filename)
 
             components_json, connections_json, zones_json = await asyncio.gather(
@@ -1394,7 +1492,7 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
             current_analysis = {
                 "components": json.loads(components_json),
                 "connections": json.loads(connections_json),
-                "zones": json.loads(zones_json)
+                "zones": json.loads(zones_json),
             }
 
             while iteration <= max_iterations:
@@ -1402,12 +1500,14 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
 
                 # Validate current analysis
                 validation_json = await self.validate_visual_analysis(
-                    user_id, session_id, filename,
+                    user_id,
+                    session_id,
+                    filename,
                     json.dumps(current_analysis["components"]),
                     json.dumps(current_analysis["connections"]),
-                    json.dumps(current_analysis["zones"])
+                    json.dumps(current_analysis["zones"]),
                 )
-                
+
                 validation = json.loads(validation_json)
                 quality_score = validation.get("quality_score", 0.0)
                 quality_progression.append(quality_score)
@@ -1417,29 +1517,32 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 # Check if quality is high enough
                 if quality_score >= 0.9:
                     logger.info(f"Quality threshold reached: {quality_score}")
-                    improvements_made.append(f"Iteration {iteration}: Quality threshold reached")
+                    improvements_made.append(
+                        f"Iteration {iteration}: Quality threshold reached"
+                    )
                     break
 
                 # Check if last iteration
                 if iteration >= max_iterations:
-                    improvements_made.append(f"Iteration {iteration}: Max iterations reached")
+                    improvements_made.append(
+                        f"Iteration {iteration}: Max iterations reached"
+                    )
                     break
 
                 # Enhance the analysis
                 logger.info(f"Enhancing analysis (quality: {quality_score})")
                 enhanced_json = await self.enhance_analysis(
-                    user_id, session_id, filename,
-                    json.dumps(current_analysis)
+                    user_id, session_id, filename, json.dumps(current_analysis)
                 )
-                
+
                 enhanced = json.loads(enhanced_json)
-                
+
                 # Update current analysis with enhanced version
                 if "original_analysis" in enhanced:
                     current_analysis = enhanced["original_analysis"]
-                
+
                 improvements_made.extend(enhanced.get("improvements", []))
-                
+
                 iteration += 1
 
             result = {
@@ -1447,7 +1550,9 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 "iterations_completed": iteration,
                 "quality_progression": quality_progression,
                 "improvements_made": improvements_made,
-                "final_quality_score": quality_progression[-1] if quality_progression else 0.0
+                "final_quality_score": (
+                    quality_progression[-1] if quality_progression else 0.0
+                ),
             }
 
             return json.dumps(result)
@@ -1488,8 +1593,7 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
             raise
 
     async def detect_line_crossings(
-        self, user_id: str, session_id: str, filename: str,
-        connections_json: str
+        self, user_id: str, session_id: str, filename: str, connections_json: str
     ) -> str:
         """Detect line crossings and determine if they are actual intersections"""
         try:
@@ -1531,7 +1635,6 @@ Identify where lines cross and determine if they actually connect or just visual
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_line_crossing_detection_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -1539,10 +1642,13 @@ Identify where lines cross and determine if they actually connect or just visual
 
             llm_request.set_output_schema(LineCrossing)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -1556,15 +1662,16 @@ Identify where lines cross and determine if they actually connect or just visual
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse line crossing response: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to detect line crossings: {e}")
             raise
 
     async def detect_trust_boundaries(
-        self, user_id: str, session_id: str, filename: str,
-        components_json: str = None
+        self, user_id: str, session_id: str, filename: str, components_json: str = None
     ) -> str:
         """Detect security and trust boundaries in architecture diagrams"""
         try:
@@ -1612,7 +1719,6 @@ Analyze the diagram to find security zones, network boundaries, and trust perime
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_trust_boundary_detection_instructions(),
-                    temperature=0.1,
                     max_output_tokens=16384,
                     response_mime_type="application/json",
                 ),
@@ -1620,10 +1726,13 @@ Analyze the diagram to find security zones, network boundaries, and trust perime
 
             llm_request.set_output_schema(TrustBoundary)
             response_text = ""
-            async for llm_response in llm.generate_content_async(llm_request, stream=False):
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
                 if llm_response.content and llm_response.content.parts:
                     text_parts = [
-                        part.text for part in llm_response.content.parts
+                        part.text
+                        for part in llm_response.content.parts
                         if hasattr(part, "text") and part.text
                     ]
                     if text_parts:
@@ -1637,7 +1746,9 @@ Analyze the diagram to find security zones, network boundaries, and trust perime
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse trust boundary response: {e}")
-                return json.dumps({"raw_response": response_text, "parse_error": str(e)})
+                return json.dumps(
+                    {"raw_response": response_text, "parse_error": str(e)}
+                )
 
         except Exception as e:
             logger.error(f"Failed to detect trust boundaries: {e}")
