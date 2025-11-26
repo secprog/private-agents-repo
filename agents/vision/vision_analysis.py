@@ -110,7 +110,7 @@ class VisionAnalysis:
             ],
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                max_output_tokens=16384,
+                max_output_tokens=50000,
                 response_mime_type="application/json",
             ),
         )
@@ -556,7 +556,7 @@ Analyze these results and identify issues, inconsistencies, and areas for improv
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_validation_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -642,7 +642,7 @@ Infer relationships that are logically implied but not explicitly shown."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_relationship_inference_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -820,7 +820,7 @@ Identify all differences, similarities, and changes."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_diagram_comparison_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -898,7 +898,7 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_enhancement_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -1186,7 +1186,7 @@ Generate PlantUML code that represents this architecture diagram."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_plantuml_export_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -1276,7 +1276,7 @@ Generate Mermaid code that represents this architecture diagram."""
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_mermaid_export_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -1367,7 +1367,7 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_drawio_export_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -1692,7 +1692,7 @@ Identify where lines cross and determine if they actually connect or just visual
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_line_crossing_detection_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
@@ -1776,7 +1776,7 @@ Analyze the diagram to find security zones, network boundaries, and trust perime
                 ],
                 config=types.GenerateContentConfig(
                     system_instruction=get_trust_boundary_detection_instructions(),
-                    max_output_tokens=16384,
+                    max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )

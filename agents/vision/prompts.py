@@ -973,7 +973,7 @@ For each mapping, extract:
 
 Also extract:
 - legend_title: Title of the legend box if present
-- position: Where the legend is located in the diagram
+- position: Bounding box of the legend (set to null if unknown)
 
 Instructions:
 - Look for boxes labeled "Legend", "Key", "Symbols", etc.

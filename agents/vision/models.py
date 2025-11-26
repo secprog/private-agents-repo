@@ -256,10 +256,7 @@ class LegendMapping(BaseModel):
 class LegendExtraction(BaseModel):
     legend_title: str = Field(default="", description="Legend box title if present")
     mappings: List[LegendMapping]
-    position: Position = Field(
-        default=Position(x=0, y=0, width=0, height=0), 
-        description="Position of legend in diagram"
-    )
+    position: Optional[Position] = None
 
 
 class LineCrossing(BaseModel):
