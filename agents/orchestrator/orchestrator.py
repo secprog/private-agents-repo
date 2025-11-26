@@ -4,6 +4,7 @@ Orchestrator Agent - Main entry point using ADK SDK
 
 import logging
 import os
+from google.adk.apps.app import App, ResumabilityConfig
 from sqlalchemy.ext.asyncio import create_async_engine  
 from a2a.server.tasks import DatabaseTaskStore
 from google.adk.sessions.database_session_service import DatabaseSessionService
@@ -39,6 +40,11 @@ orchestrator_core = OrchestratorCore()
 
 # Create A2A server using ADK SDK directly
 root_agent = orchestrator_core.workflow_agent
+orchestrator_app = App(
+    name=orchestrator_core.agent_id,
+    root_agent=root_agent,
+    resumability_config=ResumabilityConfig(is_resumable=True),
+)
 
 # Generate dynamic skills from discovered sub-agents
 dynamic_skills = orchestrator_core.get_skills_from_sub_agents()
@@ -65,12 +71,12 @@ agent_card = AgentCard(
     preferred_transport="JSONRPC",
 )
 app = to_a2a(
-    root_agent,
+    orchestrator_app,
     port=8000,
     host="0.0.0.0",
     agent_card=agent_card,
     runner=Runner(
-        app_name=orchestrator_core.agent_id,
+        app_name=orchestrator_app.name,
         agent=root_agent,
         artifact_service=artifact_service,
         session_service=session_service,
