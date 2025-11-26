@@ -70,7 +70,6 @@ QUALITY TOOLS (require analysis results as input):
 ADVANCED ANALYSIS:
 15. identify_regions - Identifies logical regions in complex diagrams
 16. analyze_by_regions - Region-based analysis for complex diagrams
-17. iterative_analysis - Iterative refinement with quality threshold (requires: max_iterations)
 
 EXPORT TOOLS (require analysis results):
 18. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
@@ -91,7 +90,6 @@ IMPORTANT EXECUTION RULES:
 - Use run_enhancement_analysis_parallel to gather technologies/classification/annotations together before deeper reasoning
 - Call enhancement tools (6-8) only if you need to re-run a specific one
 - Use quality assessment (tool 14) before analysis for complex or unclear images
-- Use iterative_analysis (tool 17) for automatic quality improvement
 - Use region-based analysis (tool 16) for very complex diagrams
 - Export tools (18-20) require JSON inputs from previous analysis
 - All tools take user_id, session_id, and filename parameters
@@ -120,7 +118,6 @@ IMPORTANT EXECUTION RULES:
         # Advanced
         vision_analysis.identify_regions,
         vision_analysis.analyze_by_regions,
-        vision_analysis.iterative_analysis,
         # Export
         vision_analysis.export_to_plantuml,
         vision_analysis.export_to_mermaid,

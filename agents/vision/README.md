@@ -87,19 +87,6 @@ python vision_agent.py
 }
 ```
 
-### Advanced Workflow - Iterative Analysis
-
-```python
-# Automatically analyze and improve quality
-{
-  "tool": "iterative_analysis",
-  "user_id": "user123",
-  "session_id": "session456",
-  "filename": "complex_diagram.png",
-  "max_iterations": 3
-}
-```
-
 ### Export to PlantUML
 
 ```python
@@ -159,9 +146,9 @@ The agent exposes 21 tools via A2A protocol on port 8002.
 
 **Quality**: `assess_image_quality`, `validate_visual_analysis`, `enhance_analysis`
 
-**Advanced**: `identify_regions`, `analyze_by_regions`, `iterative_analysis`
+**Advanced**: `identify_regions`, `analyze_by_regions`,
 
-**Export**: `export_to_plantuml`, `export_to_mermaid`
+**Export**: `export_to_plantuml`, `export_to_mermaid` , `export_to_drawio`
 
 **Comparison**: `compare_diagrams`
 
