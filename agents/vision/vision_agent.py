@@ -1,15 +1,19 @@
 """
 Vision Agent - Main entry point using ADK SDK
 """
+
 import os
 import logging
-from google.adk.auth.credential_service.in_memory_credential_service import InMemoryCredentialService
+from google.adk.auth.credential_service.in_memory_credential_service import (
+    InMemoryCredentialService,
+)
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 import uvicorn
 from google.adk.planners import plan_re_act_planner
 from fastapi.middleware.cors import CORSMiddleware
+from google.adk.tools.long_running_tool import LongRunningFunctionTool
 from google.adk_community.models.openai_llm import OpenAI
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
@@ -23,9 +27,13 @@ logger = logging.getLogger(__name__)
 
 agent_name = "vision-agent"
 # Initialize vision agent
-artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
+artifact_service = FileArtifactService(
+    root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts")
+)
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
-db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
+db_url = os.getenv(
+    "DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform"
+)
 # Convert postgresql:// to postgresql+psycopg:// for async support
 if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
@@ -96,40 +104,40 @@ IMPORTANT EXECUTION RULES:
 """,
     tools=[
         # Core analysis bundle
-        vision_analysis.run_core_analysis_parallel,
+        LongRunningFunctionTool(func=vision_analysis.run_core_analysis_parallel),
         # OCR & Text
-        vision_analysis.extract_text_from_image,
-        vision_analysis.extract_text_with_paddleocr,
-        vision_analysis.extract_text_with_consensus,
+        LongRunningFunctionTool(func=vision_analysis.extract_text_from_image),
+        LongRunningFunctionTool(func=vision_analysis.extract_text_with_paddleocr),
+        LongRunningFunctionTool(func=vision_analysis.extract_text_with_consensus),
         # Enhancement bundle
-        vision_analysis.run_enhancement_analysis_parallel,
+        LongRunningFunctionTool(func=vision_analysis.run_enhancement_analysis_parallel),
         # Enhancement
-        vision_analysis.detect_technologies,
-        vision_analysis.classify_diagram_type,
-        vision_analysis.extract_annotations,
+        LongRunningFunctionTool(func=vision_analysis.detect_technologies),
+        LongRunningFunctionTool(func=vision_analysis.classify_diagram_type),
+        LongRunningFunctionTool(func=vision_analysis.extract_annotations),
         # Analysis
-        vision_analysis.analyze_layout,
-        vision_analysis.analyze_styling,
-        vision_analysis.infer_relationships,
+        LongRunningFunctionTool(func=vision_analysis.analyze_layout),
+        LongRunningFunctionTool(func=vision_analysis.analyze_styling),
+        LongRunningFunctionTool(func=vision_analysis.infer_relationships),
         # Quality
-        vision_analysis.validate_visual_analysis,
-        vision_analysis.enhance_analysis,
-        vision_analysis.assess_image_quality,
+        LongRunningFunctionTool(func=vision_analysis.validate_visual_analysis),
+        LongRunningFunctionTool(func=vision_analysis.enhance_analysis),
+        LongRunningFunctionTool(func=vision_analysis.assess_image_quality),
         # Advanced
-        vision_analysis.identify_regions,
-        vision_analysis.analyze_by_regions,
+        LongRunningFunctionTool(func=vision_analysis.identify_regions),
+        LongRunningFunctionTool(func=vision_analysis.analyze_by_regions),
         # Export
-        vision_analysis.export_to_plantuml,
-        vision_analysis.export_to_mermaid,
-        vision_analysis.export_to_drawio,
+        LongRunningFunctionTool(func=vision_analysis.export_to_plantuml),
+        LongRunningFunctionTool(func=vision_analysis.export_to_mermaid),
+        LongRunningFunctionTool(func=vision_analysis.export_to_drawio),
         # Advanced Vision
-        vision_analysis.extract_legend_mappings,
-        vision_analysis.detect_line_crossings,
-        vision_analysis.detect_trust_boundaries,
+        LongRunningFunctionTool(func=vision_analysis.extract_legend_mappings),
+        LongRunningFunctionTool(func=vision_analysis.detect_line_crossings),
+        LongRunningFunctionTool(func=vision_analysis.detect_trust_boundaries),
         # Comparison
-        vision_analysis.compare_diagrams,
+        LongRunningFunctionTool(func=vision_analysis.compare_diagrams),
     ],
-    planner=plan_re_act_planner.PlanReActPlanner()
+    planner=plan_re_act_planner.PlanReActPlanner(),
 )
 
 merger = Agent(
@@ -153,7 +161,7 @@ Workflow:
 - For merging results: Delegate to merge_visual_analysis
 - You do not touch sub-agent's input or output, you only delegate to them.""",
     sub_agents=[visual_analysis_agent, merger],
-    planner=plan_re_act_planner.PlanReActPlanner()
+    planner=plan_re_act_planner.PlanReActPlanner(),
 )
 
 app = to_a2a(
@@ -168,7 +176,7 @@ app = to_a2a(
         session_service=session_service,
         memory_service=InMemoryMemoryService(),
         credential_service=InMemoryCredentialService(),
-    )
+    ),
 )
 
 # Add CORS middleware to A2A app
@@ -182,4 +190,3 @@ app.add_middleware(
 
 if __name__ == "__main__":
     uvicorn.run(app)
-
