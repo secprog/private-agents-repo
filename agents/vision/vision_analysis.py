@@ -1079,7 +1079,10 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
             )
 
             if not os.path.exists(file_path):
-                raise ValueError(f"File not found: {file_path}")
+                logger.warning(
+                    f"PaddleOCR source file missing at {file_path}. Falling back to GPT OCR."
+                )
+                return await self.extract_text_from_image(user_id, session_id, filename)
 
             # Use PaddleOCR MCP tool for detailed extraction
             try:
