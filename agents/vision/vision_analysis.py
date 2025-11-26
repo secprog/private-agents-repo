@@ -332,6 +332,73 @@ class VisionAnalysis:
             logger.error(f"Failed to run bundled core analysis: {e}")
             raise
 
+    async def run_enhancement_analysis_parallel(
+        self, user_id: str, session_id: str, filename: str
+    ) -> str:
+        """
+        Run technology detection, diagram classification, and annotation extraction
+        in parallel and return their results together.
+        """
+        try:
+            logger.info(
+                f"Starting bundled enhancement analysis for session_id={session_id}, filename={filename}"
+            )
+
+            part = await self.artifact_service.load_artifact(
+                app_name=APP_NAME,
+                user_id=user_id,
+                session_id=session_id,
+                filename=filename,
+                version=None,
+            )
+
+            if not part or not part.inline_data:
+                raise ValueError(
+                    f"Could not load artifact: {filename} from session {session_id}"
+                )
+
+            technologies_task = self._perform_visual_analysis(
+                part,
+                filename,
+                TechnologyDetection,
+                get_technology_detection_instructions(),
+            )
+            classification_task = self._perform_visual_analysis(
+                part,
+                filename,
+                DiagramClassification,
+                get_diagram_classification_instructions(),
+            )
+            annotations_task = self._perform_visual_analysis(
+                part,
+                filename,
+                Annotation,
+                get_annotation_extraction_instructions(),
+            )
+
+            (
+                technologies_json,
+                classification_json,
+                annotations_json,
+            ) = await asyncio.gather(
+                technologies_task, classification_task, annotations_task
+            )
+
+            bundled_result = {
+                "technologies": json.loads(technologies_json),
+                "diagram_classification": json.loads(classification_json),
+                "annotations": json.loads(annotations_json),
+                "technologies_json": technologies_json,
+                "classification_json": classification_json,
+                "annotations_json": annotations_json,
+            }
+
+            return json.dumps(bundled_result)
+
+        except Exception as e:
+            logger.error(f"Failed to run bundled enhancement analysis: {e}")
+            raise
+
     async def analyze_visual_components(
         self, user_id: str, session_id: str, filename: str
     ) -> str:
@@ -1659,7 +1726,17 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
 
                 # Update current analysis with enhanced version
                 if "original_analysis" in enhanced:
-                    current_analysis = enhanced["original_analysis"]
+                    raw_analysis = enhanced["original_analysis"]
+                    if isinstance(raw_analysis, str):
+                        try:
+                            current_analysis = json.loads(raw_analysis)
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                "Enhanced analysis original_analysis field is not valid JSON. "
+                                "Keeping previous analysis state."
+                            )
+                    elif isinstance(raw_analysis, dict):
+                        current_analysis = raw_analysis
 
                 improvements_made.extend(enhanced.get("improvements", []))
 

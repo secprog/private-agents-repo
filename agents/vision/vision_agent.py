@@ -51,47 +51,49 @@ OCR & TEXT EXTRACTION (accurate text recognition):
 3. extract_text_with_paddleocr - Extracts text using PaddleOCR (more accurate)
 4. extract_text_with_consensus - Uses both GPT and PaddleOCR for best results
 
-ENHANCEMENT TOOLS:
-5. detect_technologies - Identifies technologies, cloud services, frameworks
-6. classify_diagram_type - Classifies diagram type, notation, and style
-7. extract_annotations - Extracts notes, callouts, warnings
+ENHANCEMENT ANALYSIS (parallel bundle):
+5. run_enhancement_analysis_parallel - Runs technology detection, diagram classification, and annotation extraction together and returns parsed + raw JSON
+6. detect_technologies - Identifies technologies, cloud services, frameworks
+7. classify_diagram_type - Classifies diagram type, notation, and style
+8. extract_annotations - Extracts notes, callouts, warnings
 
 ANALYSIS TOOLS (for deeper understanding):
-8. analyze_layout - Analyzes layout structure and hierarchy
-9. analyze_styling - Analyzes color coding and visual conventions
-10. infer_relationships - Infers logical relationships not shown visually
+9. analyze_layout - Analyzes layout structure and hierarchy
+10. analyze_styling - Analyzes color coding and visual conventions
+11. infer_relationships - Infers logical relationships not shown visually
 
 QUALITY TOOLS (require analysis results as input):
-11. validate_visual_analysis - Validates analysis quality (requires: components_json, connections_json, zones_json)
-12. enhance_analysis - Enhances initial analysis (requires: initial_analysis_json)
-13. assess_image_quality - Assesses image quality before analysis
+12. validate_visual_analysis - Validates analysis quality (requires: components_json, connections_json, zones_json)
+13. enhance_analysis - Enhances initial analysis (requires: initial_analysis_json)
+14. assess_image_quality - Assesses image quality before analysis
 
 ADVANCED ANALYSIS:
-14. identify_regions - Identifies logical regions in complex diagrams
-15. analyze_by_regions - Region-based analysis for complex diagrams
-16. iterative_analysis - Iterative refinement with quality threshold (requires: max_iterations)
+15. identify_regions - Identifies logical regions in complex diagrams
+16. analyze_by_regions - Region-based analysis for complex diagrams
+17. iterative_analysis - Iterative refinement with quality threshold (requires: max_iterations)
 
 EXPORT TOOLS (require analysis results):
-17. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
-18. export_to_mermaid - Converts analysis to Mermaid code (requires: components_json, connections_json, zones_json)
-19. export_to_drawio - Converts analysis to draw.io XML (requires: components_json, connections_json, zones_json)
+18. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
+19. export_to_mermaid - Converts analysis to Mermaid code (requires: components_json, connections_json, zones_json)
+20. export_to_drawio - Converts analysis to draw.io XML (requires: components_json, connections_json, zones_json)
 
 ADVANCED VISION TOOLS:
-20. extract_legend_mappings - Extract and parse diagram legends
-21. detect_line_crossings - Detect line crossings vs actual intersections (requires: connections_json)
-22. detect_trust_boundaries - Identify security/trust boundaries (optional: components_json)
+21. extract_legend_mappings - Extract and parse diagram legends
+22. detect_line_crossings - Detect line crossings vs actual intersections (requires: connections_json)
+23. detect_trust_boundaries - Identify security/trust boundaries (optional: components_json)
 
 COMPARISON TOOLS:
-23. compare_diagrams - Compares two diagrams (requires: filename1, filename2)
+24. compare_diagrams - Compares two diagrams (requires: filename1, filename2)
 
 IMPORTANT EXECUTION RULES:
 - Always start with run_core_analysis_parallel to obtain base components/connections/zones
 - For text extraction, prefer extract_text_with_consensus (tool 4) for best accuracy
-- Call enhancement tools (5-7) in PARALLEL for additional insights
-- Use quality assessment (tool 13) before analysis for complex or unclear images
-- Use iterative_analysis (tool 16) for automatic quality improvement
-- Use region-based analysis (tool 15) for very complex diagrams
-- Export tools (17-19) require JSON inputs from previous analysis
+- Use run_enhancement_analysis_parallel to gather technologies/classification/annotations together before deeper reasoning
+- Call enhancement tools (6-8) only if you need to re-run a specific one
+- Use quality assessment (tool 14) before analysis for complex or unclear images
+- Use iterative_analysis (tool 17) for automatic quality improvement
+- Use region-based analysis (tool 16) for very complex diagrams
+- Export tools (18-20) require JSON inputs from previous analysis
 - All tools take user_id, session_id, and filename parameters
 """,
     tools=[
@@ -101,6 +103,8 @@ IMPORTANT EXECUTION RULES:
         vision_analysis.extract_text_from_image,
         vision_analysis.extract_text_with_paddleocr,
         vision_analysis.extract_text_with_consensus,
+        # Enhancement bundle
+        vision_analysis.run_enhancement_analysis_parallel,
         # Enhancement
         vision_analysis.detect_technologies,
         vision_analysis.classify_diagram_type,

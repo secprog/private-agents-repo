@@ -192,20 +192,28 @@ class Annotation(BaseModel):
 
 
 class DiagramComparison(BaseModel):
-    added_elements: List[Dict[str, Any]] = Field(default_factory=list)
-    removed_elements: List[Dict[str, Any]] = Field(default_factory=list)
-    modified_elements: List[Dict[str, Any]] = Field(default_factory=list)
-    unchanged_elements: List[Dict[str, Any]] = Field(default_factory=list)
+    model_config = ConfigDict(extra="forbid")
+
+    added_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
+    removed_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
+    modified_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
+    unchanged_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
     similarity_score: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Overall similarity score (0.0-1.0)"
     )
 
 
 class EnhancedAnalysis(BaseModel):
-    original_analysis: Dict[str, Any]
-    improvements: List[Dict[str, Any]] = Field(default_factory=list)
-    new_detections: List[Dict[str, Any]] = Field(default_factory=list)
-    confidence_improvements: Dict[str, float] = Field(default_factory=dict)
+    model_config = ConfigDict(extra="forbid")
+
+    original_analysis: str = Field(
+        ..., description="Original analysis JSON serialized as a string"
+    )
+    improvements: List["ImprovementDetail"] = Field(default_factory=list)
+    new_detections: List["DetectionDetail"] = Field(default_factory=list)
+    confidence_improvements: List["ConfidenceImprovementEntry"] = Field(
+        default_factory=list
+    )
     quality_score: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Improved quality score (0.0-1.0)"
     )
@@ -238,11 +246,83 @@ class MermaidExport(BaseModel):
     diagram_type: Literal["flowchart", "sequence", "class", "state", "er", "journey", "gantt", "pie", "graph"]
 
 
+class MetadataEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    key: str = Field(..., description="Metadata field name")
+    value: str = Field(..., description="Metadata value")
+
+
 class DrawIOExport(BaseModel):
     drawio_xml: str
     description: str
     diagram_type: Literal["architecture", "network", "flowchart", "infrastructure", "component", "other"]
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata about the diagram")
+    metadata: List[MetadataEntry] = Field(
+        default_factory=list,
+        description="Additional metadata entries for the diagram",
+    )
+
+
+class DiagramChangeDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    element_name: str = Field(
+        ..., description="Identifier or label of the element that changed"
+    )
+    element_type: Literal["component", "connection", "zone", "other"] = Field(
+        default="component", description="Type of element that changed"
+    )
+    description: str = Field(
+        default="", description="Summary of what changed for this element"
+    )
+    attributes: List[MetadataEntry] = Field(
+        default_factory=list,
+        description="Additional structured details about the change",
+    )
+
+
+class ImprovementDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(..., description="Short label for the improvement")
+    action: str = Field(..., description="Specific fix or change performed")
+    affected_elements: List[str] = Field(
+        default_factory=list, description="Elements impacted by this improvement"
+    )
+    impact: str = Field(
+        default="", description="Expected result or benefit of the improvement"
+    )
+    attributes: List[MetadataEntry] = Field(
+        default_factory=list,
+        description="Optional structured metadata about the improvement",
+    )
+
+
+class DetectionDetail(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(..., description="Identifier for the new detection")
+    description: str = Field(
+        default="", description="Explanation of the detected element"
+    )
+    confidence: confloat(ge=0.0, le=1.0) = Field(
+        default=0.0, description="Confidence in this detection"
+    )
+    attributes: List[MetadataEntry] = Field(
+        default_factory=list,
+        description="Optional structured metadata about the detection",
+    )
+
+
+class ConfidenceImprovementEntry(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    element_name: str = Field(
+        ..., description="Element whose confidence was improved"
+    )
+    new_confidence: confloat(ge=0.0, le=1.0) = Field(
+        ..., description="Updated confidence score for the element"
+    )
 
 
 # Models for advanced vision analysis

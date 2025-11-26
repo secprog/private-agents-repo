@@ -620,10 +620,11 @@ Analyze:
 - unchanged_elements: Elements that remained the same
 - similarity_score: Overall similarity score (0.0-1.0)
 
-For each change, provide detailed information about:
-- What changed (component, connection, zone)
-- How it changed (added, removed, modified)
-- Specific modifications (if applicable)
+For each change, populate a change entry with:
+- element_name: Identifier or label of the element
+- element_type: "component", "connection", "zone", or "other"
+- description: Summary of what changed
+- attributes: Optional list of key/value metadata pairs for structured details
 
 Instructions:
 - Match elements between diagrams based on names, positions, and types
@@ -648,10 +649,10 @@ Review the initial visual analysis and improve it by:
 - Refining classifications
 
 Provide:
-- original_analysis: The original analysis (preserved)
-- improvements: List of improvements made (list of dicts with improvement details)
-- new_detections: New elements detected that were missed initially
-- confidence_improvements: Dict mapping element names to improved confidence scores
+- original_analysis: The original analysis serialized as a string (valid JSON)
+- improvements: List of improvement entries (summary, action, affected_elements, impact, optional attributes list of key/value pairs)
+- new_detections: List of detection entries (name, description, confidence, optional attributes list)
+- confidence_improvements: List of entries mapping element_name to new_confidence
 - quality_score: Improved overall quality score (0.0-1.0)
 
 Instructions:
@@ -836,7 +837,9 @@ Provide:
 - drawio_xml: The complete draw.io XML code (as escaped string)
 - description: Brief description of the diagram
 - diagram_type: Type of diagram created
-- metadata: Additional info (component count, connection count, etc.)
+- metadata: List of entries describing extra info (each entry must have:
+  * key - name of the metadata field (e.g., "component_count")
+  * value - string value for that field)
 
 Return a DrawIOExport object.
 
