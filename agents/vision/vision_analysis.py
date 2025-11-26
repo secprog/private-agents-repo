@@ -121,6 +121,7 @@ class VisionAnalysis:
         response_text = ""
         finish_reason = None
         response_count = 0
+        response_debug_info = []
         async for llm_response in llm.generate_content_async(llm_request, stream=False):
             response_count += 1
             error_message = getattr(llm_response, "error_message", None)
@@ -130,14 +131,46 @@ class VisionAnalysis:
                 full_error = f"{error_prefix}{error_message}"
                 logger.error(f"LLM returned error: {full_error}")
                 raise ValueError(full_error)
+            content_summary = []
             if llm_response.content and llm_response.content.parts:
                 # Collect all text parts in case there are multiple
                 text_parts = []
-                for part in llm_response.content.parts:
-                    if hasattr(part, "text") and part.text:
-                        text_parts.append(part.text)
+                for content_part in llm_response.content.parts:
+                    part_summary = {
+                        "part_type": type(content_part).__name__,
+                    }
+                    text_value = getattr(content_part, "text", None)
+                    if text_value:
+                        text_parts.append(text_value)
+                        part_summary.update(
+                            {
+                                "has_text": True,
+                                "text_length": len(text_value),
+                                "text_preview": text_value[:200],
+                            }
+                        )
+                    else:
+                        part_summary["has_text"] = False
+
+                    inline_data = getattr(content_part, "inline_data", None)
+                    if inline_data is not None:
+                        part_summary.update(
+                            {
+                                "has_inline_data": True,
+                                "inline_mime_type": getattr(inline_data, "mime_type", None),
+                            }
+                        )
+                        inline_data_value = getattr(inline_data, "data", None)
+                        if inline_data_value is not None:
+                            part_summary["inline_data_length"] = len(inline_data_value)
+                    else:
+                        part_summary["has_inline_data"] = False
+
+                    content_summary.append(part_summary)
                 if text_parts:
                     response_text += "".join(text_parts)  # Accumulate, don't replace
+            else:
+                content_summary.append({"has_content": False})
 
             # Check finish reason to detect truncation (update from last response)
             if hasattr(llm_response, "finish_reason"):
@@ -146,9 +179,33 @@ class VisionAnalysis:
                 if hasattr(llm_response.candidates[0], "finish_reason"):
                     finish_reason = llm_response.candidates[0].finish_reason
 
+            response_debug_info.append(
+                {
+                    "index": response_count,
+                    "finish_reason": finish_reason,
+                    "error_message": error_message,
+                    "content_summary": content_summary,
+                }
+            )
+
         if not response_text:
             logger.error("Empty response from LLM")
-            raise ValueError("Empty response from LLM - no text content received")
+
+            summary_payload = response_debug_info or [{"note": "No responses emitted"}]
+            summary_text = ""
+            try:
+                summary_text = json.dumps(
+                    summary_payload, ensure_ascii=False, default=str
+                )
+                logger.error("LLM raw response summary: %s", summary_text)
+            except Exception as debug_exc:
+                logger.error(f"Failed to serialize response debug info: {debug_exc}")
+                logger.error(f"Raw debug info repr: {summary_payload!r}")
+                summary_text = repr(summary_payload)
+
+            raise ValueError(
+                f"Empty response from LLM - no text content received. Summary: {summary_text}"
+            )
 
         # Check if response was truncated
         if finish_reason and finish_reason in [
