@@ -10,6 +10,7 @@ from google.adk.auth.credential_service.in_memory_credential_service import (
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
+from google.adk.apps.app import App, ResumabilityConfig
 import uvicorn
 from google.adk.planners import plan_re_act_planner
 from fastapi.middleware.cors import CORSMiddleware
@@ -164,13 +165,19 @@ Workflow:
     planner=plan_re_act_planner.PlanReActPlanner(),
 )
 
+vision_app = App(
+    name=agent_name,
+    root_agent=root_agent,
+    resumability_config=ResumabilityConfig(is_resumable=True),
+)
+
 app = to_a2a(
-    agent=root_agent,
+    agent=vision_app,
     port=8002,
     host=agent_name,
     protocol="http",
     runner=Runner(
-        app_name=agent_name,
+        app_name=vision_app.name,
         agent=root_agent,
         artifact_service=artifact_service,
         session_service=session_service,
