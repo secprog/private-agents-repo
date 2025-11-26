@@ -37,7 +37,7 @@ visual_analysis_agent = Agent(
     name="visual_analyzer",
     description="Specialized agent for analyzing visual elements from images with advanced capabilities",
     model=OpenAI(model="gpt-5.1"),
-    instruction="""You are an advanced visual analysis agent specialized in analyzing architecture diagrams and images.
+    instruction="""You are an advanced visual analysis agent specialized in analyzing diagrams and images.
 
 You have multiple tools available for comprehensive analysis:
 
@@ -91,24 +91,9 @@ IMPORTANT EXECUTION RULES:
 - Use quality assessment (tool 15) before analysis for complex or unclear images
 - Use iterative_analysis (tool 18) for automatic quality improvement
 - Use region-based analysis (tool 17) for very complex diagrams
-- Export tools (19-20) require JSON inputs from previous analysis
+- Export tools (19-21) require JSON inputs from previous analysis
 - All tools take user_id, session_id, and filename parameters
-
-Example workflows:
-BASIC WORKFLOW:
-1. assess_image_quality - Check if image is suitable
-2. analyze_visual_components, analyze_visual_connections, analyze_visual_zones (parallel)
-3. extract_text_with_consensus, detect_technologies, classify_diagram_type (parallel)
-
-ADVANCED WORKFLOW:
-1. iterative_analysis - Automatically performs analysis with quality improvement
-2. export_to_plantuml, export_to_mermaid, or export_to_drawio - Generate editable code
-
-COMPLEX DIAGRAM WORKFLOW:
-1. assess_image_quality - Check complexity
-2. analyze_by_regions - Region-based detailed analysis
-3. validate_visual_analysis - Quality check
-4. export_to_drawio - Generate draw.io diagram (fully editable)""",
+""",
     tools=[
         # Core analysis
         vision_analysis.analyze_visual_components,
@@ -158,7 +143,7 @@ merger = Agent(
 # Create A2A server using ADK SDK directly
 root_agent = Agent(
     name=agent_name.replace("-", "_"),
-    description="Specialized agent for visual analysis of architecture diagrams and images.",
+    description="Specialized agent for visual analysis of diagrams and images.",
     model=OpenAI(model="gpt-5.1"),
     instruction="""For visual analysis tasks, you have two sub-agents:
 1. visual_analyzer - Performs visual analysis using tools (components, connections, zones)

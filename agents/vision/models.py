@@ -1,6 +1,6 @@
 from typing import List, Literal, Dict, Any
 
-from pydantic import BaseModel, Field, confloat
+from pydantic import BaseModel, Field, confloat, ConfigDict
 
 # Pydantic models for Visual Analysis
 class Position(BaseModel):
@@ -94,10 +94,27 @@ class ValidationIssue(BaseModel):
     affected_elements: List[str] = Field(default_factory=list)
 
 
+class CorrectionSuggestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(..., description="Short description of the correction")
+    action: str = Field(..., description="Specific fix or change to apply")
+    affected_elements: List[str] = Field(
+        default_factory=list,
+        description="Components or connections impacted by this correction"
+    )
+    priority: Literal["high", "medium", "low"] = Field(
+        default="medium", description="Urgency/impact of applying the correction"
+    )
+    impact: str = Field(
+        default="", description="Expected improvement after applying the correction"
+    )
+
+
 class ValidationResult(BaseModel):
     is_valid: bool
     issues: List[ValidationIssue]
-    corrections: List[Dict[str, Any]] = Field(default_factory=list)
+    corrections: List[CorrectionSuggestion] = Field(default_factory=list)
     suggestions: List[str] = Field(default_factory=list)
     quality_score: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Overall quality score (0.0-1.0)"

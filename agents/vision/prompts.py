@@ -452,7 +452,12 @@ For each issue, provide:
 - affected_elements: List of component/connection names affected
 
 Also provide:
-- corrections: Suggested corrections (list of dicts with corrections)
+- corrections: Structured correction suggestions. For each entry include:
+  * summary - short name of the correction
+  * action - specific fix or change to apply
+  * affected_elements - list of impacted components/connections
+  * priority - "high", "medium", or "low"
+  * impact - expected improvement after applying the change
 - suggestions: General improvement suggestions
 - quality_score: Overall quality score (0.0-1.0)
 
