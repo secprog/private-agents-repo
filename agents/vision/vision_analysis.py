@@ -269,6 +269,69 @@ class VisionAnalysis:
             # Return as a JSON string containing the raw text
             return json.dumps({"raw_response": response_text, "parse_error": str(e)})
 
+    async def run_core_analysis_parallel(
+        self, user_id: str, session_id: str, filename: str
+    ) -> str:
+        """
+        Run the components, connections, and zones analysis passes in parallel
+        and return all results in a single JSON payload.
+        """
+        try:
+            logger.info(
+                f"Starting bundled core analysis for session_id={session_id}, filename={filename}"
+            )
+
+            part = await self.artifact_service.load_artifact(
+                app_name=APP_NAME,
+                user_id=user_id,
+                session_id=session_id,
+                filename=filename,
+                version=None,
+            )
+
+            if not part or not part.inline_data:
+                raise ValueError(
+                    f"Could not load artifact: {filename} from session {session_id}"
+                )
+
+            components_task = self._perform_visual_analysis(
+                part,
+                filename,
+                VisualComponent,
+                get_component_analysis_instructions(),
+            )
+            connections_task = self._perform_visual_analysis(
+                part,
+                filename,
+                VisualConnection,
+                get_connection_analysis_instructions(),
+            )
+            zones_task = self._perform_visual_analysis(
+                part,
+                filename,
+                VisualZone,
+                get_zone_analysis_instructions(),
+            )
+
+            components_json, connections_json, zones_json = await asyncio.gather(
+                components_task, connections_task, zones_task
+            )
+
+            bundled_result = {
+                "components": json.loads(components_json),
+                "connections": json.loads(connections_json),
+                "zones": json.loads(zones_json),
+                "components_json": components_json,
+                "connections_json": connections_json,
+                "zones_json": zones_json,
+            }
+
+            return json.dumps(bundled_result)
+
+        except Exception as e:
+            logger.error(f"Failed to run bundled core analysis: {e}")
+            raise
+
     async def analyze_visual_components(
         self, user_id: str, session_id: str, filename: str
     ) -> str:

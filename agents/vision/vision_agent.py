@@ -41,64 +41,62 @@ visual_analysis_agent = Agent(
 
 You have multiple tools available for comprehensive analysis:
 
-CORE ANALYSIS TOOLS (call in parallel for complete analysis):
-1. analyze_visual_components - Extracts visual components (nodes, boxes, icons, etc.)
-2. analyze_visual_connections - Extracts visual connections (arrows, lines, etc.)
-3. analyze_visual_zones - Extracts visual zones (regions, boundaries, etc.)
+CORE ANALYSIS (single parallel bundle):
+1. run_core_analysis_parallel - Runs component, connection, and zone analysis at the same time and returns:
+   * components / connections / zones arrays
+   * components_json / connections_json / zones_json raw payloads
 
 OCR & TEXT EXTRACTION (accurate text recognition):
-4. extract_text_from_image - Extracts text using GPT
-5. extract_text_with_paddleocr - Extracts text using PaddleOCR (more accurate)
-6. extract_text_with_consensus - Uses both GPT and PaddleOCR for best results
+2. extract_text_from_image - Extracts text using GPT
+3. extract_text_with_paddleocr - Extracts text using PaddleOCR (more accurate)
+4. extract_text_with_consensus - Uses both GPT and PaddleOCR for best results
 
 ENHANCEMENT TOOLS:
-7. detect_technologies - Identifies technologies, cloud services, frameworks
-8. classify_diagram_type - Classifies diagram type, notation, and style
-9. extract_annotations - Extracts notes, callouts, warnings
+5. detect_technologies - Identifies technologies, cloud services, frameworks
+6. classify_diagram_type - Classifies diagram type, notation, and style
+7. extract_annotations - Extracts notes, callouts, warnings
 
 ANALYSIS TOOLS (for deeper understanding):
-10. analyze_layout - Analyzes layout structure and hierarchy
-11. analyze_styling - Analyzes color coding and visual conventions
-12. infer_relationships - Infers logical relationships not shown visually
+8. analyze_layout - Analyzes layout structure and hierarchy
+9. analyze_styling - Analyzes color coding and visual conventions
+10. infer_relationships - Infers logical relationships not shown visually
 
 QUALITY TOOLS (require analysis results as input):
-13. validate_visual_analysis - Validates analysis quality (requires: components_json, connections_json, zones_json)
-14. enhance_analysis - Enhances initial analysis (requires: initial_analysis_json)
-15. assess_image_quality - Assesses image quality before analysis
+11. validate_visual_analysis - Validates analysis quality (requires: components_json, connections_json, zones_json)
+12. enhance_analysis - Enhances initial analysis (requires: initial_analysis_json)
+13. assess_image_quality - Assesses image quality before analysis
 
 ADVANCED ANALYSIS:
-16. identify_regions - Identifies logical regions in complex diagrams
-17. analyze_by_regions - Region-based analysis for complex diagrams
-18. iterative_analysis - Iterative refinement with quality threshold (requires: max_iterations)
+14. identify_regions - Identifies logical regions in complex diagrams
+15. analyze_by_regions - Region-based analysis for complex diagrams
+16. iterative_analysis - Iterative refinement with quality threshold (requires: max_iterations)
 
 EXPORT TOOLS (require analysis results):
-19. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
-20. export_to_mermaid - Converts analysis to Mermaid code (requires: components_json, connections_json, zones_json)
-21. export_to_drawio - Converts analysis to draw.io XML (requires: components_json, connections_json, zones_json)
+17. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
+18. export_to_mermaid - Converts analysis to Mermaid code (requires: components_json, connections_json, zones_json)
+19. export_to_drawio - Converts analysis to draw.io XML (requires: components_json, connections_json, zones_json)
 
 ADVANCED VISION TOOLS:
-22. extract_legend_mappings - Extract and parse diagram legends
-23. detect_line_crossings - Detect line crossings vs actual intersections (requires: connections_json)
-24. detect_trust_boundaries - Identify security/trust boundaries (optional: components_json)
+20. extract_legend_mappings - Extract and parse diagram legends
+21. detect_line_crossings - Detect line crossings vs actual intersections (requires: connections_json)
+22. detect_trust_boundaries - Identify security/trust boundaries (optional: components_json)
 
 COMPARISON TOOLS:
-25. compare_diagrams - Compares two diagrams (requires: filename1, filename2)
+23. compare_diagrams - Compares two diagrams (requires: filename1, filename2)
 
 IMPORTANT EXECUTION RULES:
-- For comprehensive analysis, FIRST call core tools (1-3) in PARALLEL
-- For text extraction, prefer extract_text_with_consensus (tool 6) for best accuracy
-- Call enhancement tools (7-9) in PARALLEL for additional insights
-- Use quality assessment (tool 15) before analysis for complex or unclear images
-- Use iterative_analysis (tool 18) for automatic quality improvement
-- Use region-based analysis (tool 17) for very complex diagrams
-- Export tools (19-21) require JSON inputs from previous analysis
+- Always start with run_core_analysis_parallel to obtain base components/connections/zones
+- For text extraction, prefer extract_text_with_consensus (tool 4) for best accuracy
+- Call enhancement tools (5-7) in PARALLEL for additional insights
+- Use quality assessment (tool 13) before analysis for complex or unclear images
+- Use iterative_analysis (tool 16) for automatic quality improvement
+- Use region-based analysis (tool 15) for very complex diagrams
+- Export tools (17-19) require JSON inputs from previous analysis
 - All tools take user_id, session_id, and filename parameters
 """,
     tools=[
-        # Core analysis
-        vision_analysis.analyze_visual_components,
-        vision_analysis.analyze_visual_connections,
-        vision_analysis.analyze_visual_zones,
+        # Core analysis bundle
+        vision_analysis.run_core_analysis_parallel,
         # OCR & Text
         vision_analysis.extract_text_from_image,
         vision_analysis.extract_text_with_paddleocr,
@@ -146,11 +144,11 @@ root_agent = Agent(
     description="Specialized agent for visual analysis of diagrams and images.",
     model=OpenAI(model="gpt-5.1"),
     instruction="""For visual analysis tasks, you have two sub-agents:
-1. visual_analyzer - Performs visual analysis using tools (components, connections, zones)
+1. visual_analyzer - Performs visual analysis using tools (and uses run_core_analysis_parallel to fetch components/connections/zones together)
 2. merge_visual_analysis - Merges visual analysis results into unified representation
 
 Workflow:
-- For visual analysis: Delegate to visual_analyzer (it will call all tools in parallel)
+- For visual analysis: Delegate to visual_analyzer (it uses run_core_analysis_parallel to gather core data up front)
 - For merging results: Delegate to merge_visual_analysis
 - You do not touch sub-agent's input or output, you only delegate to them.""",
     sub_agents=[visual_analysis_agent, merger],
