@@ -519,7 +519,13 @@ Identify:
   * "other" - Other layout patterns
 
 - layers: List of identified layers/tiers (e.g., ["Frontend", "API Gateway", "Backend", "Database"])
-- groups: Visual groups identified (list of dicts with group info)
+- groups: Visual groups identified. For each group provide:
+  * group_name - Label/title of the group
+  * group_type - "layer", "zone", "cluster", "swimlane", "boundary", or "other"
+  * description - Short summary of the group's purpose (can be empty)
+  * components - List of component names that belong to the group
+  * position - Bounding box if known, otherwise null
+  * confidence - Confidence in the grouping (0.0-1.0)
 - hierarchy_levels: Number of hierarchy levels detected
 
 Instructions:

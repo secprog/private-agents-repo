@@ -1,4 +1,4 @@
-from typing import List, Literal, Dict, Any
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field, confloat, ConfigDict
 
@@ -134,12 +134,39 @@ class InferredRelationship(BaseModel):
     reasoning: str = Field(..., description="Why this relationship was inferred")
 
 
+class LayoutGroup(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    group_name: str = Field(..., description="Name or label for the visual group")
+    group_type: Literal[
+        "layer", "zone", "cluster", "swimlane", "boundary", "other"
+    ] = Field(..., description="Kind of grouping represented")
+    description: str = Field(
+        default="", description="Summary of what the group represents"
+    )
+    components: List[str] = Field(
+        default_factory=list,
+        description="Components contained within this group",
+    )
+    position: Optional[Position] = Field(
+        default=None,
+        description="Bounding box describing the group's visual region if available",
+    )
+    confidence: confloat(ge=0.0, le=1.0) = Field(
+        default=0.0, description="Confidence score for the group identification"
+    )
+
+
 class LayoutStructure(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     layout_type: Literal[
         "hierarchical", "layered", "circular", "grid", "freeform", "other"
     ]
     layers: List[str] = Field(default_factory=list, description="Identified layers/tiers")
-    groups: List[Dict[str, Any]] = Field(default_factory=list, description="Visual groups identified")
+    groups: List[LayoutGroup] = Field(
+        default_factory=list, description="Visual groups identified"
+    )
     hierarchy_levels: int = Field(default=0, description="Number of hierarchy levels detected")
 
 
