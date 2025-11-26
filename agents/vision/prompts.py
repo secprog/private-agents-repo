@@ -821,6 +821,11 @@ For drawio_xml, generate:
 - Appropriate styles based on component/connection types
 - Zones as swimlanes or containers
 
+Important:
+- Each cell (vertex or edge) is a single <mxCell> node under <root>.
+- An edge cell must have attributes edge="1" and optionally source="..." and target="..." and a single <mxGeometry> child.
+- You must NOT put another <mxCell> as a child of <mxCell>.
+
 Provide:
 - drawio_xml: The complete draw.io XML code (as escaped string)
 - description: Brief description of the diagram
