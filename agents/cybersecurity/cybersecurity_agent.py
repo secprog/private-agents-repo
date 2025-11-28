@@ -8,6 +8,7 @@ from google.adk.auth.credential_service.in_memory_credential_service import InMe
 from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
+from google.adk.apps.app import App, ResumabilityConfig
 import uvicorn
 from google.adk.planners import plan_re_act_planner
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +21,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
+app_identifier = agent_name.replace("-", "_")
 
 # Initialize services
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
@@ -66,11 +68,11 @@ CRITICAL:
 
 # Create A2A server using ADK SDK directly
 root_agent = Agent(
-    name=agent_name.replace("-", "_"),
+    name=app_identifier,
     description="Specialized agent for cybersecurity architecture analysis and threat assessment.",
     model=OpenAI(model="gpt-5.1"),
     instruction="""You are a cybersecurity specialist agent.
-
+    
 Your role is to analyze architecture diagrams for security threats, vulnerabilities, and compliance.
 
 IMPORTANT WORKFLOW:
@@ -86,6 +88,12 @@ Do not modify the input or output data.""",
     planner=plan_re_act_planner.PlanReActPlanner()
 )
 
+cyber_app = App(
+    name=app_identifier,
+    root_agent=root_agent,
+    resumability_config=ResumabilityConfig(is_resumable=True),
+)
+
 
 app = to_a2a(
     agent=root_agent,
@@ -93,8 +101,7 @@ app = to_a2a(
     host=agent_name,
     protocol="http",
     runner=Runner(
-        app_name=agent_name,
-        agent=root_agent,
+        app=cyber_app,
         artifact_service=InMemoryArtifactService(),
         session_service=session_service,
         memory_service=InMemoryMemoryService(),

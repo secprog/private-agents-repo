@@ -266,12 +266,16 @@ body {
     border-radius: var(--border-radius-sm);
     margin-bottom: 0.5rem;
     background: var(--bg-tertiary);
+    overflow: hidden;
+    min-width: 0;
 }
 
 .agent-info {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
 }
 
 .agent-icon {
@@ -608,6 +612,36 @@ body {
     word-wrap: break-word;
 }
 
+.message-actions {
+    margin-top: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.message-action-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.message-action-btn i {
+    color: var(--accent-color);
+}
+
+.message-action-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+}
+
 /* Tool Call Messages */
 .tool-call-message .message-bubble {
     background: var(--bg-tertiary);
@@ -823,6 +857,63 @@ body {
 .typing-text {
     font-size: 0.875rem;
     color: var(--text-tertiary);
+}
+
+/* Input Context Banner */
+.input-context-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+    background: rgba(249, 115, 22, 0.1);
+    border: 1px solid rgba(249, 115, 22, 0.4);
+    border-radius: var(--border-radius-sm);
+    margin-bottom: 1rem;
+}
+
+.banner-info {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.banner-info i {
+    color: var(--accent-color);
+    font-size: 1.1rem;
+}
+
+.banner-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.banner-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.banner-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.banner-clear-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.banner-clear-btn:hover {
+    color: var(--error-color);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 /* Input Container */
@@ -1191,6 +1282,11 @@ body {
 
 .status-waiting {
     color: #f59e0b;
+    font-weight: 600;
+}
+
+.status-input-required {
+    color: #f97316;
     font-weight: 600;
 }
 

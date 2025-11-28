@@ -62,22 +62,22 @@ agent_card = AgentCard(
                 "required": False,
                 "params": {"maxChunkBytes": 1000000},  # 1MB
             }
-        ]
+        ], 
+        "streaming": True,
     },
     skills=dynamic_skills,  # Use dynamically generated skills
-    defaultInputModes=["text/plain"],
-    defaultOutputModes=["text/plain"],
-    supportsAuthenticatedExtendedCard=False,
+    default_input_modes=["text/plain"],
+    default_output_modes=["text/plain"],
+    supports_authenticated_extended_card=False,
     preferred_transport="JSONRPC",
 )
 app = to_a2a(
-    orchestrator_app,
+    agent=root_agent,
     port=8000,
     host="0.0.0.0",
     agent_card=agent_card,
     runner=Runner(
-        app_name=orchestrator_app.name,
-        agent=root_agent,
+        app=orchestrator_app,
         artifact_service=artifact_service,
         session_service=session_service,
         memory_service=InMemoryMemoryService(),

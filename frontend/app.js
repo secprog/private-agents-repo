@@ -3,6 +3,8 @@
  * Handles UI interactions, JSON-RPC communication, and A2A protocol
  */
 
+const TERMINAL_TASK_STATES = new Set(['completed', 'failed', 'cancelled']);
+
 class A2AUploadService {
     constructor(apiEndpoint) {
         this.apiEndpoint = apiEndpoint;
@@ -172,9 +174,18 @@ class AgentPlatform {
         this.sessions = [];
         this.agents = [];
         this.attachments = [];
+        this.pendingInputRequests = new Map();
+        this.activeInputContext = null;
+        this.defaultInputPlaceholder = 'Type your message... (Press Enter to send, Shift+Enter for new line)';
         this.isTyping = false;
         this.processingSessions = new Set(); // Track which sessions are currently processing
         this.toolCallMessages = new Map(); // Track tool calls by ID to match requests and responses
+        this.activeTaskStorageKey = 'activeTaskSubscriptions';
+        this.activeTaskSubscriptions = new Map(); // taskId -> subscription metadata
+        this.streamContexts = new Map(); // streamId -> context
+        this.sessionArtifactRefs = new Map(); // sessionId -> [{ app, user, session, filename, mime }]
+
+        this.loadActiveTaskSubscriptionsFromStorage();
 
         // Initialize A2A upload service
         this.uploadService = new A2AUploadService(this.apiEndpoint);
@@ -186,6 +197,11 @@ class AgentPlatform {
         this.setupEventListeners();
         this.loadSessions();
         this.updateUserDisplay();
+        this.sessions.forEach(session => {
+            if (!this.sessionArtifactRefs.has(session.id)) {
+                this.sessionArtifactRefs.set(session.id, []);
+            }
+        });
 
         // Initialize input controls as disabled until agent status is determined
         this.updateInputControlsState(false);
@@ -194,6 +210,7 @@ class AgentPlatform {
         this.updateOrchestratorHeader();
         this.applyTheme();
         this.initializePushNotifications();
+        this.resumeActiveTaskStreams();
     }
 
     generateSessionId() {
@@ -294,7 +311,11 @@ class AgentPlatform {
         if (messageInput) {
             messageInput.disabled = !isAgentOnline;
             if (isAgentOnline) {
-                messageInput.placeholder = 'Type your message... (Press Enter to send, Shift+Enter for new line)';
+                if (this.activeInputContext) {
+                    messageInput.placeholder = this.getInputContextPlaceholder(this.activeInputContext);
+                } else {
+                    messageInput.placeholder = this.defaultInputPlaceholder;
+                }
             } else {
                 messageInput.placeholder = 'Agent is offline - please wait for connection...';
             }
@@ -464,6 +485,10 @@ class AgentPlatform {
         // Clear sessions
         this.sessions = [];
         this.sessionId = this.generateSessionId();
+        this.pendingInputRequests.clear();
+        this.clearActiveInputContext();
+        this.sessionArtifactRefs.clear();
+        this.sessionArtifactRefs.set(this.sessionId, []);
 
         // Update UI
         this.updateUserDisplay();
@@ -485,6 +510,12 @@ class AgentPlatform {
         // Message input
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
+        this.inputContextBanner = document.getElementById('inputContextBanner');
+        this.inputContextDetails = document.getElementById('inputContextDetails');
+        const clearInputContextBtn = document.getElementById('clearInputContextBtn');
+        if (clearInputContextBtn) {
+            clearInputContextBtn.addEventListener('click', () => this.clearActiveInputContext());
+        }
 
         messageInput.addEventListener('input', (e) => {
             this.autoResizeTextarea(e.target);
@@ -740,35 +771,417 @@ class AgentPlatform {
         }
     }
 
-    // Utility method to poll task status
-    async pollTaskStatus(taskId, maxAttempts = 10, interval = 2000) {
-        let attempts = 0;
+    // Stream JSON-RPC request according to A2A streaming spec (message/stream, tasks/resubscribe, etc.)
+    async streamJsonRpcRequest({ method, params, sessionId, resumeContext = null, requestId = null }) {
+        const id = requestId || this.generateMessageId();
+        const payload = {
+            jsonrpc: "2.0",
+            method,
+            params,
+            id
+        };
 
-        const poll = async () => {
+        const controller = new AbortController();
+        const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream, application/json'
+        };
+
+        try {
+            const response = await fetch(this.apiEndpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            });
+
+            if (!response.ok) {
+                const error = `HTTP error! status: ${response.status}`;
+                this.showToast(error, 'error');
+                throw new Error(error);
+            }
+
+            const context = {
+                streamId: id,
+                sessionId,
+                method,
+                controller,
+                resumeContext
+            };
+
+            this.streamContexts.set(id, context);
+
+            const consumption = this.consumeStreamResponse(response, context)
+                .catch(err => {
+                    if (err.name === 'AbortError') return;
+                    console.error(`Stream ${id} failed:`, err);
+                    this.showToast('Streaming channel interrupted', 'warning');
+                })
+                .finally(() => {
+                    this.streamContexts.delete(id);
+                });
+
+            context.consumePromise = consumption;
+
+            return { streamId: id, controller };
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error(`Error starting stream for ${method}:`, error);
+                this.showToast('Failed to open streaming channel', 'error');
+            }
+            throw error;
+        }
+    }
+
+    async consumeStreamResponse(response, context) {
+        const contentType = response.headers.get('content-type') || '';
+
+        if (!response.body || !response.body.getReader) {
+            const data = await response.json();
+            this.handleStreamPayload(data, context);
+            return;
+        }
+
+        const reader = response.body.getReader();
+
+        if (contentType.includes('text/event-stream')) {
+            await this.consumeSseStream(reader, context);
+        } else {
+            await this.consumeNdjsonStream(reader, context);
+        }
+    }
+
+    async consumeSseStream(reader, context) {
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            buffer = this.processSseBuffer(buffer, context);
+        }
+
+        if (buffer.trim().length > 0) {
+            this.processSseBuffer(buffer + '\n\n', context);
+        }
+    }
+
+    processSseBuffer(buffer, context) {
+        let delimiter;
+        while ((delimiter = buffer.indexOf('\n\n')) !== -1) {
+            const rawEvent = buffer.slice(0, delimiter);
+            buffer = buffer.slice(delimiter + 2);
+
+            const lines = rawEvent.split(/\r?\n/);
+            const dataLines = lines
+                .filter(line => line.startsWith('data:'))
+                .map(line => line.slice(5).trim());
+
+            if (dataLines.length === 0) continue;
+
+            const payload = dataLines.join('\n');
+            this.handleStreamChunk(payload, context);
+        }
+        return buffer;
+    }
+
+    async consumeNdjsonStream(reader, context) {
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            buffer = this.processNdjsonBuffer(buffer, context);
+        }
+
+        if (buffer.trim().length > 0) {
+            this.handleStreamChunk(buffer.trim(), context);
+        }
+    }
+
+    processNdjsonBuffer(buffer, context) {
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+            const chunk = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+            if (chunk) {
+                this.handleStreamChunk(chunk, context);
+            }
+        }
+        return buffer;
+    }
+
+    handleStreamChunk(chunk, context) {
+        if (!chunk) return;
+        const trimmed = chunk.trim();
+        if (!trimmed) return;
+
+        const payloads = this.extractJsonPayloads(trimmed);
+        payloads.forEach(payloadStr => {
+            if (!payloadStr) return;
             try {
-                const response = await this.getTaskStatus(taskId);
-                const task = response.result || response;
-
-                // Check if task is complete
-                if (task.status && ['completed', 'failed', 'cancelled'].includes(task.status.state)) {
-                    return task;
-                }
-
-                // Continue polling if not complete and within max attempts
-                if (attempts < maxAttempts) {
-                    attempts++;
-                    setTimeout(poll, interval);
-                } else {
-                    console.warn(`Task ${taskId} polling timeout after ${maxAttempts} attempts`);
-                    return task;
-                }
+                const payload = JSON.parse(payloadStr);
+                this.handleStreamPayload(payload, context);
             } catch (error) {
-                console.error(`Error polling task ${taskId}:`, error);
-                throw error;
+                console.warn('Failed to parse stream chunk:', payloadStr, error);
+            }
+        });
+    }
+
+    extractJsonPayloads(chunk) {
+        const payloads = [];
+
+        const trySingle = chunk => {
+            try {
+                JSON.parse(chunk);
+                payloads.push(chunk);
+                return true;
+            } catch (e) {
+                return false;
             }
         };
 
-        return poll();
+        if (trySingle(chunk)) {
+            return payloads;
+        }
+
+        const segments = [];
+        let depth = 0;
+        let start = null;
+        let inString = false;
+        let escapeNext = false;
+
+        for (let i = 0; i < chunk.length; i++) {
+            const char = chunk[i];
+
+            if (escapeNext) {
+                escapeNext = false;
+                continue;
+            }
+
+            if (char === '\\') {
+                escapeNext = true;
+                continue;
+            }
+
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+
+            if (inString) {
+                continue;
+            }
+
+            if (char === '{' || char === '[') {
+                if (depth === 0) {
+                    start = i;
+                }
+                depth++;
+            } else if (char === '}' || char === ']') {
+                depth = Math.max(0, depth - 1);
+                if (depth === 0 && start !== null) {
+                    segments.push(chunk.slice(start, i + 1));
+                    start = null;
+                }
+            }
+        }
+
+        if (segments.length > 0) {
+            return segments;
+        }
+
+        // Fallback: split on newlines that look like JSON boundaries
+        const fallback = chunk.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        return fallback.length > 0 ? fallback : [chunk];
+    }
+
+    handleStreamPayload(payload, context) {
+        if (!payload) return;
+
+        if (payload.error) {
+            const message = this.getJSONRPCErrorMessage(payload.error);
+            this.showToast(message, 'error');
+            if (context.sessionId) {
+                this.updateTypingIndicatorForSession(context.sessionId, false);
+            }
+            return;
+        }
+
+        const normalized = this.normalizeTaskPayload(payload);
+        if (normalized) {
+            this.handleAgentResponse(normalized, context.sessionId);
+            this.trackTaskSubscription(normalized.result, context);
+        } else {
+            console.debug('Streaming payload without task result:', payload);
+        }
+    }
+
+    normalizeTaskPayload(payload) {
+        if (!payload) return null;
+
+        if (payload.result && payload.result.kind === 'task') {
+            return payload;
+        }
+
+        if (payload.result && payload.result.kind === 'status-update') {
+            return payload;
+        }
+
+        if (payload.result && payload.result.task) {
+            return {
+                jsonrpc: '2.0',
+                result: payload.result.task
+            };
+        }
+
+        if (payload.method && payload.params && payload.params.task) {
+            return {
+                jsonrpc: '2.0',
+                result: payload.params.task
+            };
+        }
+
+        return null;
+    }
+
+    trackTaskSubscription(task, context) {
+        if (!task || !task.id) return;
+
+        const subscriptionInfo = this.extractSubscriptionInfo(task);
+
+        if (!subscriptionInfo) {
+            if (this.isTerminalTaskState(task.status?.state)) {
+                this.completeTaskSubscription(task.id);
+            }
+            return;
+        }
+
+        const record = {
+            taskId: task.id,
+            subscriptionId: subscriptionInfo.subscriptionId,
+            sessionId: context.sessionId,
+            lastEventId: subscriptionInfo.lastEventId || null,
+            lastState: task.status?.state || null,
+            updatedAt: new Date().toISOString()
+        };
+
+        this.persistActiveSubscriptionRecord(record);
+
+        if (this.isTerminalTaskState(task.status?.state)) {
+            this.completeTaskSubscription(task.id);
+        }
+    }
+
+    extractSubscriptionInfo(task) {
+        if (!task) return null;
+
+        const candidates = [
+            task.subscription,
+            task.subscriptionInfo,
+            task.subscription_details,
+            task.status?.subscription,
+            task.status?.subscriptionInfo
+        ];
+
+        let subscriptionId = task.subscriptionId || task.subscription_id || null;
+        let lastEventId = task.lastEventId || task.last_event_id || null;
+
+        for (const candidate of candidates) {
+            if (!candidate) continue;
+            subscriptionId = subscriptionId || candidate.subscriptionId || candidate.subscription_id || candidate.id;
+            lastEventId = lastEventId || candidate.lastEventId || candidate.last_event_id || candidate.checkpoint;
+        }
+
+        if (!subscriptionId && task.status?.subscriptionId) {
+            subscriptionId = task.status.subscriptionId;
+        }
+
+        if (subscriptionId) {
+            return {
+                subscriptionId,
+                lastEventId: lastEventId || null
+            };
+        }
+
+        return null;
+    }
+
+    persistActiveSubscriptionRecord(record) {
+        if (!record.taskId || !record.subscriptionId) return;
+        this.activeTaskSubscriptions.set(record.taskId, record);
+        this.saveActiveTaskSubscriptions();
+    }
+
+    completeTaskSubscription(taskId) {
+        if (!taskId) return;
+        if (this.activeTaskSubscriptions.has(taskId)) {
+            this.activeTaskSubscriptions.delete(taskId);
+            this.saveActiveTaskSubscriptions();
+        }
+    }
+
+    loadActiveTaskSubscriptionsFromStorage() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(this.activeTaskStorageKey) || '{}');
+            Object.values(stored).forEach(record => {
+                if (record.taskId && record.subscriptionId) {
+                    this.activeTaskSubscriptions.set(record.taskId, record);
+                }
+            });
+        } catch (error) {
+            console.warn('Failed to parse active task subscription store:', error);
+            localStorage.removeItem(this.activeTaskStorageKey);
+            this.activeTaskSubscriptions.clear();
+        }
+    }
+
+    saveActiveTaskSubscriptions() {
+        const payload = {};
+        this.activeTaskSubscriptions.forEach((value, key) => {
+            payload[key] = value;
+        });
+        localStorage.setItem(this.activeTaskStorageKey, JSON.stringify(payload));
+    }
+
+    async resumeActiveTaskStreams() {
+        if (this.activeTaskSubscriptions.size === 0) {
+            return;
+        }
+
+        for (const record of Array.from(this.activeTaskSubscriptions.values())) {
+            if (!record.subscriptionId) continue;
+            if (record.lastState && this.isTerminalTaskState(record.lastState)) {
+                this.activeTaskSubscriptions.delete(record.taskId);
+                continue;
+            }
+
+            try {
+                await this.streamJsonRpcRequest({
+                    method: 'tasks/resubscribe',
+                    params: {
+                        subscription_id: record.subscriptionId,
+                        after_event_id: record.lastEventId || undefined
+                    },
+                    sessionId: record.sessionId,
+                    resumeContext: record
+                });
+                console.log(`Resubscribed to task ${record.taskId}`);
+            } catch (error) {
+                console.error(`Failed to resume subscription ${record.subscriptionId}:`, error);
+                this.activeTaskSubscriptions.delete(record.taskId);
+            }
+        }
+
+        this.saveActiveTaskSubscriptions();
+    }
+
+    isTerminalTaskState(state) {
+        if (!state) return false;
+        return TERMINAL_TASK_STATES.has(state.toLowerCase());
     }
 
     // Initialize push notifications
@@ -1074,6 +1487,10 @@ class AgentPlatform {
             console.log('Using existing sessionId:', this.sessionId);
         }
 
+        const activeInputTaskId = this.activeInputContext?.taskId || null;
+        const targetSessionId = this.activeInputContext?.sessionId || this.sessionId;
+        const contextIdForMessage = this.activeInputContext?.contextId || this.sessionId;
+
         // Save a copy of attachments before clearing (needed for both chat display and message sending)
         let attachmentsCopy = [...this.attachments];
 
@@ -1083,8 +1500,9 @@ class AgentPlatform {
             type: 'user',
             content: content,
             attachments: [...attachmentsCopy], // Create another copy for chat message
-            timestamp: new Date().toISOString()
-        });
+            timestamp: new Date().toISOString(),
+            taskId: activeInputTaskId || undefined
+        }, true, targetSessionId);
 
         // Clear input and attachments preview immediately (after copying to message)
         messageInput.value = '';
@@ -1101,33 +1519,35 @@ class AgentPlatform {
         }
 
         // Show typing indicator for current session
-        this.showTypingIndicator(this.sessionId);
+        this.showTypingIndicator(targetSessionId);
 
-        // Send via JSON-RPC using A2A's message/send method
+        // Send via JSON-RPC streaming using A2A's message/stream method
         try {
             // Build message parts (text + any attached files)
-            const parts = [{
-                kind: 'text',
-                text: content
-            }];
+        const parts = [{
+            kind: 'text',
+            text: content
+        }];
+        const artifactRefsAdded = [];
 
             // Add attached files as DataPart with artifact references (A2A compliant)
             // Use the saved copy since this.attachments was cleared for UI
             for (const attachment of attachmentsCopy) {
                 if (attachment.uploaded && attachment.filename) {
-                    // Use proper A2A DataPart with artifact reference
-                    parts.push({
-                        kind: 'data',
-                        data: {
-                            artifactRef: {
-                                app: "agent-platform",
-                                user: this.userId,
-                                session: this.sessionId,
-                                filename: attachment.filename,
-                                mime: attachment.type || 'application/octet-stream'
-                            }
-                        }
-                    });
+                const artifactRef = {
+                    app: "agent-platform",
+                    user: this.userId,
+                    session: contextIdForMessage,
+                    filename: attachment.filename,
+                    mime: attachment.type || 'application/octet-stream'
+                };
+                parts.push({
+                    kind: 'data',
+                    data: {
+                        artifactRef
+                    }
+                });
+                artifactRefsAdded.push(artifactRef);
                 } else if (!attachment.uploaded) {
                     // Skip files that haven't finished uploading
                     this.showToast(`File "${attachment.name}" is still uploading. Please wait.`, 'warning');
@@ -1135,6 +1555,26 @@ class AgentPlatform {
                 }
             }
             
+        if (artifactRefsAdded.length > 0) {
+            this.registerSessionArtifacts(contextIdForMessage, artifactRefsAdded);
+        }
+
+        const hasArtifactParts = parts.some(
+            part => part.kind === 'data' && part.data && part.data.artifactRef
+        );
+
+        if (!hasArtifactParts) {
+            const storedArtifactRefs = this.getStoredArtifactsForSession(contextIdForMessage);
+            storedArtifactRefs.forEach(ref => {
+                parts.push({
+                    kind: 'data',
+                    data: {
+                        artifactRef: { ...ref }
+                    }
+                });
+            });
+        }
+
             // Clear attachmentsCopy after using it to build message parts
             attachmentsCopy = [];
 
@@ -1143,30 +1583,39 @@ class AgentPlatform {
                 message_id: this.generateMessageId(),
                 role: 'user',
                 parts: parts,
-                context_id: this.sessionId
-                // Don't include task_id - let A2A protocol create new task for each message
+                context_id: contextIdForMessage
             };
 
+            if (activeInputTaskId) {
+                messageObj.task_id = activeInputTaskId;
+            }
+
             // Capture sessionId at time of sending to prevent cross-contamination
-            const sendingSessionId = this.sessionId;
+            const sendingSessionId = contextIdForMessage;
             console.log('Captured sessionId for this message:', sendingSessionId);
 
-            const response = await this.sendJSONRPCRequest('message/send', {
-                message: messageObj,
-                context: {
-                    session_id: sendingSessionId,
-                    user_id: this.userId
-                }
+            await this.streamJsonRpcRequest({
+                method: 'message/stream',
+                params: {
+                    message: messageObj,
+                    context: {
+                        session_id: sendingSessionId,
+                        user_id: this.userId
+                    }
+                },
+                sessionId: sendingSessionId
             });
 
-            // Ensure attachments are cleared after successful send (cleanup)
+            // Ensure attachments are cleared after the stream is established (cleanup)
             this.clearAttachments();
-            
-            this.handleAgentResponse(response, sendingSessionId);
+
+            if (activeInputTaskId) {
+                this.markInputRequestResponded(activeInputTaskId);
+            }
         } catch (error) {
             console.error('Error sending message:', error);
 
-            // sendJSONRPCRequest already shows toast for JSON-RPC errors
+            // streamJsonRpcRequest already shows toast for JSON-RPC errors
             // Only show toast for network/connection errors
             if (error.message && error.message.includes('HTTP error!')) {
                 this.showToast('Failed to send message', 'error');
@@ -1179,7 +1628,7 @@ class AgentPlatform {
             if (this.processingSessions.has(sendingSessionId)) {
                 this.processingSessions.delete(sendingSessionId);
             }
-            this.hideTypingIndicator();
+            this.hideTypingIndicator(sendingSessionId);
         }
     }
 
@@ -1189,15 +1638,6 @@ class AgentPlatform {
 
 
     handleAgentResponse(data, capturedSessionId = null) {
-        // Remove session from processing set when response is received
-        if (capturedSessionId && this.processingSessions.has(capturedSessionId)) {
-            this.processingSessions.delete(capturedSessionId);
-            // Hide typing indicator if this was the current session
-            if (capturedSessionId === this.sessionId) {
-        this.hideTypingIndicator();
-            }
-        }
-
         console.log('Raw A2A response:', data);
 
         // Check for JSON-RPC errors first
@@ -1211,6 +1651,9 @@ class AgentPlatform {
                 timestamp: new Date().toISOString(),
                 agent: this.currentAgentName
             }, true, capturedSessionId);
+            if (capturedSessionId) {
+                this.updateTypingIndicatorForSession(capturedSessionId, false);
+            }
             return;
         }
 
@@ -1219,6 +1662,11 @@ class AgentPlatform {
             const result = data.result;
 
             // Check if this is a task response
+            if (result.kind === "status-update") {
+                this.handleStatusUpdate(result, capturedSessionId);
+                return;
+            }
+
             if (result.kind === "task" && result.status) {
                 const task = result;
                 const taskId = task.id;
@@ -1243,12 +1691,18 @@ class AgentPlatform {
                 // Handle different task states
                 if (taskStatus.state === "completed") {
                     this.handleTaskComplete(task, capturedSessionId);
+                    this.updateTypingIndicatorForSession(capturedSessionId, false);
                 } else if (taskStatus.state === "failed") {
                     this.handleTaskFailed(task, capturedSessionId);
+                    this.updateTypingIndicatorForSession(capturedSessionId, false);
                 } else if (taskStatus.state === "running") {
                     this.handleTaskRunning(task, capturedSessionId);
+                    this.updateTypingIndicatorForSession(capturedSessionId, true);
                 } else if (taskStatus.state === "waiting") {
                     this.handleTaskWaiting(task, capturedSessionId);
+                    this.updateTypingIndicatorForSession(capturedSessionId, true);
+                } else if (taskStatus.state === "input-required") {
+                    this.handleTaskInputRequired(task, capturedSessionId);
                 }
 
                 // Handle artifacts (the actual response content)
@@ -1262,7 +1716,8 @@ class AgentPlatform {
                                         type: 'agent',
                                         content: part.text,
                                         timestamp: taskStatus.timestamp || new Date().toISOString(),
-                                        agent: this.currentAgentName
+                                        agent: this.currentAgentName,
+                                        taskId: taskId
                                     }, true, capturedSessionId);
                                 } else if (part.kind === "data" && part.data) {
                                     // Check if this is artifactRef - handle as attachment
@@ -1279,7 +1734,8 @@ class AgentPlatform {
                                                 uploaded: true
                                             }],
                                             timestamp: taskStatus.timestamp || new Date().toISOString(),
-                                            agent: this.currentAgentName
+                                            agent: this.currentAgentName,
+                                            taskId: taskId
                                         }, true, capturedSessionId);
                                     } else if (this.isToolCallData(part.data)) {
                                         // Handle tool call data - format as JSON string for detection
@@ -1289,7 +1745,8 @@ class AgentPlatform {
                                             type: 'agent',
                                             content: toolCallContent,
                                             timestamp: taskStatus.timestamp || new Date().toISOString(),
-                                            agent: this.currentAgentName
+                                            agent: this.currentAgentName,
+                                            taskId: taskId
                                         }, true, capturedSessionId);
                                     }
                                 }
@@ -1307,6 +1764,9 @@ class AgentPlatform {
             } else if (result.history && Array.isArray(result.history)) {
                 // Handle history-based response (fallback)
                 const latestMessage = result.history[result.history.length - 1];
+                if (capturedSessionId) {
+                    this.updateTypingIndicatorForSession(capturedSessionId, false);
+                }
                 if (latestMessage && latestMessage.kind === "message") {
                     // Extract artifactRef attachments
                     const attachments = this.extractArtifactRefs(latestMessage);
@@ -1331,6 +1791,9 @@ class AgentPlatform {
                 timestamp: new Date().toISOString(),
                 agent: this.currentAgentName
             }, true, capturedSessionId);
+            if (capturedSessionId) {
+                this.updateTypingIndicatorForSession(capturedSessionId, false);
+            }
         }
     }
 
@@ -1385,6 +1848,53 @@ class AgentPlatform {
         return attachments;
     }
 
+    registerSessionArtifacts(sessionId, artifacts) {
+        if (!sessionId || !artifacts || artifacts.length === 0) {
+            return;
+        }
+        const existing = this.sessionArtifactRefs.get(sessionId) || [];
+        const existingKeys = new Set(existing.map(ref => this.getArtifactKey(ref)));
+        let updated = false;
+
+        artifacts.forEach(ref => {
+            const key = this.getArtifactKey(ref);
+            if (!existingKeys.has(key)) {
+                existing.push({ ...ref });
+                existingKeys.add(key);
+                updated = true;
+            }
+        });
+
+        if (updated || !this.sessionArtifactRefs.has(sessionId)) {
+            this.sessionArtifactRefs.set(sessionId, existing);
+        }
+    }
+
+    getStoredArtifactsForSession(sessionId) {
+        if (!sessionId) {
+            return [];
+        }
+        return this.sessionArtifactRefs.get(sessionId) || [];
+    }
+
+    clearSessionArtifacts(sessionId) {
+        if (!sessionId) {
+            return;
+        }
+        this.sessionArtifactRefs.delete(sessionId);
+    }
+
+    getArtifactKey(ref) {
+        if (!ref) {
+            return '';
+        }
+        const app = ref.app || '';
+        const user = ref.user || '';
+        const session = ref.session || '';
+        const filename = ref.filename || '';
+        return `${app}:${user}:${session}:${filename}`;
+    }
+
     // Check if data object represents a tool call
     isToolCallData(data) {
         if (!data || typeof data !== 'object') return false;
@@ -1398,6 +1908,8 @@ class AgentPlatform {
         console.log('Task completed:', task);
         this.showToast(`Task ${task.id} completed successfully!`, 'success');
 
+        this.resolveInputRequest(task.id);
+
         // Add completion message to chat if there's a status message
         if (task.status && task.status.message) {
             const attachments = this.extractArtifactRefs(task.status.message);
@@ -1407,7 +1919,8 @@ class AgentPlatform {
                 content: `✅ **Task Completed**\n\n${this.formatA2AMessage(task.status.message)}`,
                 attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: this.currentAgentName
+                agent: this.currentAgentName,
+                taskId: task.id
             }, true, sessionId);
         }
     }
@@ -1416,6 +1929,8 @@ class AgentPlatform {
     handleTaskFailed(task, sessionId = null) {
         console.log('Task failed:', task);
         this.showToast(`Task ${task.id} failed`, 'error');
+
+        this.resolveInputRequest(task.id);
 
         // Add error message to chat
         if (task.status.message) {
@@ -1426,7 +1941,8 @@ class AgentPlatform {
                 content: `❌ **Task Failed**\n\n${this.formatA2AMessage(task.status.message)}`,
                 attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: this.currentAgentName
+                agent: this.currentAgentName,
+                taskId: task.id
             }, true, sessionId);
         }
     }
@@ -1435,6 +1951,8 @@ class AgentPlatform {
     handleTaskRunning(task, sessionId = null) {
         console.log('Task running:', task);
         this.showToast(`Task ${task.id} is running...`, 'info');
+
+        this.resolveInputRequest(task.id);
 
         // Add running status message to chat if there's a status message
         if (task.status && task.status.message) {
@@ -1445,7 +1963,8 @@ class AgentPlatform {
                 content: `🔄 **Task Running**\n\n${this.formatA2AMessage(task.status.message)}`,
                 attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: this.currentAgentName
+                agent: this.currentAgentName,
+                taskId: task.id
             }, true, sessionId);
         }
     }
@@ -1454,6 +1973,8 @@ class AgentPlatform {
     handleTaskWaiting(task, sessionId = null) {
         console.log('Task waiting:', task);
         this.showToast(`Task ${task.id} is waiting...`, 'info');
+
+        this.resolveInputRequest(task.id);
 
         // Add waiting status message to chat if there's a status message
         if (task.status && task.status.message) {
@@ -1464,9 +1985,332 @@ class AgentPlatform {
                 content: `⏳ **Task Waiting**\n\n${this.formatA2AMessage(task.status.message)}`,
                 attachments: attachments.length > 0 ? attachments : undefined,
                 timestamp: task.status.timestamp || new Date().toISOString(),
-                agent: this.currentAgentName
+                agent: this.currentAgentName,
+                taskId: task.id
             }, true, sessionId);
         }
+    }
+
+    handleTaskInputRequired(task, sessionId = null) {
+        if (!task || !task.id) {
+            console.warn('Input-required event missing task info:', task);
+            return;
+        }
+
+        const taskId = task.id;
+        const status = task.status || {};
+        const targetSessionId = sessionId || status.contextId || this.sessionId;
+        const attachments = this.extractArtifactRefs(status.message);
+        const formattedContent = status.message
+            ? this.formatA2AMessage(status.message)
+            : 'The agent needs additional information to continue.';
+        const timestamp = status.timestamp || new Date().toISOString();
+        const messageId = status.message?.messageId || null;
+        const existing = this.pendingInputRequests.get(taskId);
+
+        if (existing && messageId && existing.messageId === messageId) {
+            if (targetSessionId === this.sessionId) {
+                this.setActiveInputRequest(taskId);
+            }
+            if (task.status) {
+                this.updateTaskStatus(taskId, status);
+            }
+            this.updateTypingIndicatorForSession(targetSessionId, false);
+            return;
+        }
+
+        const requestEntry = {
+            taskId,
+            sessionId: targetSessionId,
+            contextId: targetSessionId,
+            prompt: formattedContent,
+            timestamp,
+            messageId
+        };
+
+        this.pendingInputRequests.set(taskId, requestEntry);
+
+        this.addMessageToChat({
+            id: messageId || this.generateMessageId(),
+            type: 'agent',
+            content: `⚠️ **Input Required**\n\n${formattedContent}`,
+            attachments: attachments.length > 0 ? attachments : undefined,
+            timestamp,
+            agent: this.currentAgentName,
+            taskId: taskId,
+            inputRequiredTaskId: taskId,
+            inputRequiredContextId: targetSessionId,
+            inputRequiredPrompt: formattedContent
+        }, true, targetSessionId);
+
+        this.showToast(`Task ${this.formatTaskId(taskId)} needs more info`, 'warning');
+
+        if (task.status) {
+            this.updateTaskStatus(taskId, status);
+        }
+
+        if (targetSessionId === this.sessionId) {
+            this.setActiveInputRequest(taskId);
+        }
+
+        this.updateTypingIndicatorForSession(targetSessionId, false);
+    }
+
+    setActiveInputRequest(taskId, fallbackContextId = null, fallbackPrompt = null) {
+        if (!taskId) {
+            return;
+        }
+
+        let request = this.pendingInputRequests.get(taskId);
+        if (!request && fallbackContextId) {
+            request = {
+                taskId,
+                sessionId: fallbackContextId,
+                contextId: fallbackContextId,
+                prompt: fallbackPrompt || 'Provide the requested information for this task.',
+                timestamp: new Date().toISOString()
+            };
+            this.pendingInputRequests.set(taskId, request);
+        }
+
+        if (!request) {
+            this.showToast('This task is no longer waiting for input.', 'warning');
+            return;
+        }
+
+        if (request.sessionId && this.sessionId && request.sessionId !== this.sessionId) {
+            this.showToast('Switch to the original session to respond to this task.', 'warning');
+            return;
+        }
+
+        this.activeInputContext = request;
+        this.showInputContextBanner(request);
+    }
+
+    showInputContextBanner(request) {
+        if (!request) {
+            return;
+        }
+
+        if (this.inputContextBanner) {
+            this.inputContextBanner.style.display = 'flex';
+            this.inputContextBanner.setAttribute('data-task-id', request.taskId);
+        }
+
+        if (this.inputContextDetails) {
+            const preview = this.truncateText(request.prompt || '', 140);
+            const taskLabel = this.formatTaskId(request.taskId);
+            this.inputContextDetails.textContent = taskLabel
+                ? `Task ${taskLabel} • ${preview}`
+                : preview;
+        }
+
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput && !messageInput.disabled) {
+            messageInput.placeholder = this.getInputContextPlaceholder(request);
+        }
+    }
+
+    clearActiveInputContext() {
+        this.activeInputContext = null;
+
+        if (this.inputContextBanner) {
+            this.inputContextBanner.style.display = 'none';
+            this.inputContextBanner.removeAttribute('data-task-id');
+        }
+
+        if (this.inputContextDetails) {
+            this.inputContextDetails.textContent = '';
+        }
+
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput && !messageInput.disabled) {
+            messageInput.placeholder = this.defaultInputPlaceholder;
+        }
+    }
+
+    getInputContextPlaceholder(request) {
+        if (!request) {
+            return this.defaultInputPlaceholder;
+        }
+        const taskLabel = this.formatTaskId(request.taskId);
+        return taskLabel
+            ? `Provide additional input for task ${taskLabel}...`
+            : 'Provide the requested input...';
+    }
+
+    markInputRequestResponded(taskId) {
+        if (!taskId) {
+            this.clearActiveInputContext();
+            return;
+        }
+        const request = this.pendingInputRequests.get(taskId);
+        if (request) {
+            request.lastResponseAt = new Date().toISOString();
+        }
+        if (this.activeInputContext && this.activeInputContext.taskId === taskId) {
+            this.clearActiveInputContext();
+        }
+    }
+
+    resolveInputRequest(taskId) {
+        if (!taskId) {
+            return;
+        }
+        if (this.pendingInputRequests.has(taskId)) {
+            this.pendingInputRequests.delete(taskId);
+        }
+        if (this.activeInputContext && this.activeInputContext.taskId === taskId) {
+            this.clearActiveInputContext();
+        }
+    }
+
+    removeInputRequestsForSession(sessionId) {
+        if (!sessionId) {
+            return;
+        }
+        let removed = false;
+        for (const [taskId, request] of Array.from(this.pendingInputRequests.entries())) {
+            if (request.sessionId === sessionId) {
+                this.pendingInputRequests.delete(taskId);
+                removed = true;
+            }
+        }
+        if (removed && this.activeInputContext && this.activeInputContext.sessionId === sessionId) {
+            this.clearActiveInputContext();
+        }
+    }
+
+    restoreInputContextForSession(sessionId) {
+        if (!sessionId) {
+            this.clearActiveInputContext();
+            return;
+        }
+        for (const request of this.pendingInputRequests.values()) {
+            if (request.sessionId === sessionId) {
+                this.activeInputContext = request;
+                this.showInputContextBanner(request);
+                return;
+            }
+        }
+        this.clearActiveInputContext();
+    }
+
+    truncateText(text, maxLength = 140) {
+        if (!text) {
+            return '';
+        }
+        if (text.length <= maxLength) {
+            return text;
+        }
+        return `${text.slice(0, maxLength - 3)}...`;
+    }
+
+    handleStatusUpdate(statusUpdate, sessionId = null) {
+        if (!statusUpdate || !statusUpdate.status) {
+            console.warn('Status update payload missing status object:', statusUpdate);
+            return;
+        }
+
+        const statusPayload = statusUpdate.status;
+        const targetSessionId = sessionId || statusUpdate.contextId || this.sessionId;
+        const attachments = this.extractArtifactRefs(statusPayload.message);
+        const normalizedState = (statusPayload.state || '').toLowerCase();
+
+        if (normalizedState === 'input-required' && statusUpdate.taskId) {
+            this.handleTaskInputRequired(
+                { id: statusUpdate.taskId, status: statusPayload },
+                targetSessionId
+            );
+            return;
+        }
+
+        const heading = this.buildStatusUpdateHeading(statusUpdate);
+        const bodyContent = statusPayload.message
+            ? this.formatA2AMessage(statusPayload.message)
+            : 'Status update received.';
+
+        const messageSegments = [];
+        if (heading) {
+            messageSegments.push(heading);
+        }
+        if (bodyContent) {
+            messageSegments.push(bodyContent);
+        }
+
+        const messageContent = messageSegments.join('\n\n').trim() || 'Status update received.';
+
+        this.addMessageToChat({
+            id: statusPayload.message?.messageId || this.generateMessageId(),
+            type: 'agent',
+            content: messageContent,
+            attachments: attachments.length > 0 ? attachments : undefined,
+            timestamp: statusPayload.timestamp || statusUpdate.timestamp || new Date().toISOString(),
+            taskId: statusUpdate.taskId || null
+        }, true, targetSessionId);
+
+        if (statusUpdate.taskId) {
+            this.updateTaskStatus(statusUpdate.taskId, statusPayload);
+        }
+
+        if (typeof statusUpdate.final === 'boolean') {
+            this.updateTypingIndicatorForSession(targetSessionId, !statusUpdate.final);
+        }
+
+        if (statusUpdate.taskId && normalizedState && normalizedState !== 'input-required') {
+            this.resolveInputRequest(statusUpdate.taskId);
+        }
+    }
+
+    buildStatusUpdateHeading(statusUpdate) {
+        if (!statusUpdate || !statusUpdate.status) {
+            return '';
+        }
+
+        const state = statusUpdate.status.state;
+        const author = statusUpdate.metadata?.adk_author;
+        const formattedAuthor = author ? this.formatAgentName(author) : null;
+        const segments = [];
+
+        segments.push(`${this.getStatusStateIcon(state)} Status Update`);
+
+        if (state) {
+            const normalizedState = state.charAt(0).toUpperCase() + state.slice(1);
+            segments.push(normalizedState);
+        }
+
+        if (formattedAuthor) {
+            segments.push(`by ${formattedAuthor}`);
+        }
+
+        if (statusUpdate.taskId) {
+            segments.push(`task ${this.formatTaskId(statusUpdate.taskId)}`);
+        }
+
+        return segments.join(' • ');
+    }
+
+    getStatusStateIcon(state) {
+        if (!state) {
+            return '📡';
+        }
+
+        const iconMap = {
+            completed: '✅',
+            success: '✅',
+            failed: '❌',
+            error: '⚠️',
+            waiting: '⏳',
+            queued: '⏳',
+            running: '🔄',
+            working: '🔄',
+            planning: '🧠',
+            thinking: '🧠',
+            'input-required': '✋'
+        };
+
+        const key = state.toLowerCase();
+        return iconMap[key] || '📡';
     }
 
     formatAgentResponse(result) {
@@ -1606,6 +2450,21 @@ class AgentPlatform {
             bubble.appendChild(attachmentsDiv);
         }
 
+        if (message.inputRequiredTaskId) {
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'message-actions';
+            const actionBtn = document.createElement('button');
+            actionBtn.className = 'message-action-btn';
+            actionBtn.innerHTML = '<i class="fas fa-reply"></i><span>Provide Required Input</span>';
+            actionBtn.addEventListener('click', () => this.setActiveInputRequest(
+                message.inputRequiredTaskId,
+                message.inputRequiredContextId || this.sessionId,
+                message.inputRequiredPrompt || message.content
+            ));
+            actionsDiv.appendChild(actionBtn);
+            bubble.appendChild(actionsDiv);
+        }
+
         contentDiv.appendChild(header);
         contentDiv.appendChild(bubble);
 
@@ -1623,7 +2482,7 @@ class AgentPlatform {
             const targetSessionId = sessionId || this.sessionId;
             // Only save if we have a valid task ID for this specific message
             // Don't use this.lastTaskId as it might be from a previous message/session
-            this.saveMessageToSession(message, null, targetSessionId);
+            this.saveMessageToSession(message, message?.taskId || null, targetSessionId);
         }
     }
 
@@ -1764,6 +2623,16 @@ class AgentPlatform {
             .join(' ');
     }
 
+    formatTaskId(taskId) {
+        if (!taskId) {
+            return '';
+        }
+
+        return taskId.length > 16
+            ? `${taskId.slice(0, 8)}…${taskId.slice(-4)}`
+            : taskId;
+    }
+
     // Update existing tool call card with response
     updateToolCallCard(card, toolCall) {
         const toolName = toolCall.name;
@@ -1845,35 +2714,40 @@ class AgentPlatform {
 
 
     showTypingIndicator(sessionId = null) {
-        const targetSessionId = sessionId || this.sessionId;
-        const indicator = document.getElementById('typingIndicator');
-        
-        // Add session to processing set
-        if (targetSessionId) {
-            this.processingSessions.add(targetSessionId);
-        }
-        
-        // Only show indicator if current session is processing
-        if (this.processingSessions.has(this.sessionId)) {
-        indicator.style.display = 'flex';
-            this.isTyping = true;
-
-        // Auto-scroll
-        const container = document.querySelector('.chat-container');
-        container.scrollTop = container.scrollHeight;
-    }
+        this.updateTypingIndicatorForSession(sessionId || this.sessionId, true);
     }
 
     hideTypingIndicator(sessionId = null) {
+        this.updateTypingIndicatorForSession(sessionId || this.sessionId, false);
+    }
+
+    updateTypingIndicatorForSession(sessionId, isProcessing) {
         const targetSessionId = sessionId || this.sessionId;
-        
-        // Only hide if current session is the target, or if no target specified and current session is not processing
-        if (!targetSessionId || targetSessionId === this.sessionId) {
-        const indicator = document.getElementById('typingIndicator');
-            
-            // Only hide if current session is not in processing set
-            if (!this.processingSessions.has(this.sessionId)) {
-        indicator.style.display = 'none';
+        if (!targetSessionId) {
+            return;
+        }
+
+        if (isProcessing) {
+            this.processingSessions.add(targetSessionId);
+        } else {
+            this.processingSessions.delete(targetSessionId);
+        }
+
+        if (targetSessionId === this.sessionId) {
+            const indicator = document.getElementById('typingIndicator');
+            if (!indicator) {
+                return;
+            }
+
+            if (isProcessing) {
+                indicator.style.display = 'flex';
+                this.isTyping = true;
+                const container = document.querySelector('.chat-container');
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                }
+            } else if (!this.processingSessions.has(this.sessionId)) {
+                indicator.style.display = 'none';
                 this.isTyping = false;
             }
         }
@@ -2350,6 +3224,7 @@ class AgentPlatform {
         // Generate a new session ID for the new session
         this.sessionId = this.generateSessionId();
         console.log('New sessionId:', this.sessionId);
+        this.sessionArtifactRefs.set(this.sessionId, []);
 
         // Generate a new session with the new session ID
         const session = this.generateSessionData();
@@ -2358,6 +3233,8 @@ class AgentPlatform {
         this.sessions.push(session);
         console.log('➕ Added new session to sessions array:', { id: session.id, taskIds: session.taskIds });
         console.log('📊 Current sessions count:', this.sessions.length);
+
+        this.clearActiveInputContext();
 
         // Store in localStorage
         const sessionData = JSON.parse(localStorage.getItem('sessionData') || '{}');
@@ -2477,6 +3354,11 @@ class AgentPlatform {
                 created_at: conv.created_at,
                 lastMessageAt: conv.lastMessageAt || conv.created_at
             };
+        });
+        this.sessions.forEach(session => {
+            if (!this.sessionArtifactRefs.has(session.id)) {
+                this.sessionArtifactRefs.set(session.id, []);
+            }
         });
 
         this.updateSessionsList();
@@ -2644,6 +3526,7 @@ class AgentPlatform {
             }
 
             this.sessions.push(newSession);
+            this.sessionArtifactRefs.set(newSession.id, []);
 
             // Store session data in localStorage
             const sessionData = JSON.parse(localStorage.getItem('sessionData') || '{}');
@@ -2679,6 +3562,7 @@ class AgentPlatform {
         if (session) {
             // Set the session ID to the session ID (they're the same)
             this.sessionId = sessionId;
+            this.restoreInputContextForSession(sessionId);
 
             // Clear chat messages completely
             const chatMessages = document.getElementById('chatMessages');
@@ -2827,6 +3711,9 @@ class AgentPlatform {
         this.sessions = this.sessions.filter(c => c.id !== sessionId);
         console.log('Sessions after deletion:', this.sessions.length);
 
+        this.removeInputRequestsForSession(sessionId);
+        this.clearSessionArtifacts(sessionId);
+
         // Remove session from localStorage
         const sessionData = JSON.parse(localStorage.getItem('sessionData') || '{}');
         delete sessionData[sessionId];
@@ -2838,6 +3725,7 @@ class AgentPlatform {
             console.log('Deleting current session, clearing current session');
             // Generate new session ID for new session
             this.sessionId = this.generateSessionId();
+            this.sessionArtifactRefs.set(this.sessionId, []);
 
             // Clear the chat area and recreate welcome message
             const chatMessages = document.getElementById('chatMessages');
@@ -2888,12 +3776,17 @@ class AgentPlatform {
         // Clear all sessions (in-memory only)
         this.sessions = [];
 
+        this.pendingInputRequests.clear();
+        this.clearActiveInputContext();
+        this.sessionArtifactRefs.clear();
+
         // Clear session data from localStorage
         localStorage.removeItem('sessionData');
 
         // Generate new session ID for new session
         this.sessionId = this.generateSessionId();
         console.log('🆕 Generated new sessionId after clear all:', this.sessionId);
+        this.sessionArtifactRefs.set(this.sessionId, []);
 
         // Clear the chat area and recreate welcome message
         const chatMessages = document.getElementById('chatMessages');

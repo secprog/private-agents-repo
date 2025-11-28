@@ -27,6 +27,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 agent_name = "vision-agent"
+agent_identifier = agent_name.replace("-", "_")
 # Initialize vision agent
 artifact_service = FileArtifactService(
     root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts")
@@ -78,20 +79,19 @@ QUALITY TOOLS (require analysis results as input):
 
 ADVANCED ANALYSIS:
 15. identify_regions - Identifies logical regions in complex diagrams
-16. analyze_by_regions - Region-based analysis for complex diagrams
 
 EXPORT TOOLS (require analysis results):
-18. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
-19. export_to_mermaid - Converts analysis to Mermaid code (requires: components_json, connections_json, zones_json)
-20. export_to_drawio - Converts analysis to draw.io XML (requires: components_json, connections_json, zones_json)
+16. export_to_plantuml - Converts analysis to PlantUML code (requires: components_json, connections_json, zones_json)
+17. export_to_mermaid - Converts analysis to Mermaid code (requires: components_json, connections_json, zones_json)
+18. export_to_drawio - Converts analysis to draw.io XML (requires: components_json, connections_json, zones_json)
 
 ADVANCED VISION TOOLS:
-21. extract_legend_mappings - Extract and parse diagram legends
-22. detect_line_crossings - Detect line crossings vs actual intersections (requires: connections_json)
-23. detect_trust_boundaries - Identify security/trust boundaries (optional: components_json)
+19. extract_legend_mappings - Extract and parse diagram legends
+20. detect_line_crossings - Detect line crossings vs actual intersections (requires: connections_json)
+21. detect_trust_boundaries - Identify security/trust boundaries (optional: components_json)
 
 COMPARISON TOOLS:
-24. compare_diagrams - Compares two diagrams (requires: filename1, filename2)
+22. compare_diagrams - Compares two diagrams (requires: filename1, filename2)
 
 IMPORTANT EXECUTION RULES:
 - Always start with run_core_analysis_parallel to obtain base components/connections/zones
@@ -99,9 +99,7 @@ IMPORTANT EXECUTION RULES:
 - Use run_enhancement_analysis_parallel to gather technologies/classification/annotations together before deeper reasoning
 - Call enhancement tools (6-8) only if you need to re-run a specific one
 - Use quality assessment (tool 14) before analysis for complex or unclear images
-- Use region-based analysis (tool 16) for very complex diagrams
-- Export tools (18-20) require JSON inputs from previous analysis
-- All tools take user_id, session_id, and filename parameters
+- Export tools (16-18) require JSON inputs from previous analysis
 """,
     tools=[
         # Core analysis bundle
@@ -125,8 +123,8 @@ IMPORTANT EXECUTION RULES:
         LongRunningFunctionTool(func=vision_analysis.enhance_analysis),
         LongRunningFunctionTool(func=vision_analysis.assess_image_quality),
         # Advanced
-        LongRunningFunctionTool(func=vision_analysis.identify_regions),
-        LongRunningFunctionTool(func=vision_analysis.analyze_by_regions),
+        #LongRunningFunctionTool(func=vision_analysis.identify_regions),
+        #LongRunningFunctionTool(func=vision_analysis.analyze_by_regions),
         # Export
         LongRunningFunctionTool(func=vision_analysis.export_to_plantuml),
         LongRunningFunctionTool(func=vision_analysis.export_to_mermaid),
@@ -150,7 +148,7 @@ merger = Agent(
 
 # Create A2A server using ADK SDK directly
 root_agent = Agent(
-    name=agent_name.replace("-", "_"),
+    name=agent_identifier,
     description="Specialized agent for visual analysis of diagrams and images.",
     model=OpenAI(model="gpt-5.1"),
     instruction="""For visual analysis tasks, you have two sub-agents:
@@ -166,19 +164,18 @@ Workflow:
 )
 
 vision_app = App(
-    name=agent_name,
+    name=agent_identifier,
     root_agent=root_agent,
     resumability_config=ResumabilityConfig(is_resumable=True),
 )
 
 app = to_a2a(
-    agent=vision_app,
+    agent=root_agent,
     port=8002,
     host=agent_name,
     protocol="http",
     runner=Runner(
-        app_name=vision_app.name,
-        agent=root_agent,
+        app=vision_app,
         artifact_service=artifact_service,
         session_service=session_service,
         memory_service=InMemoryMemoryService(),

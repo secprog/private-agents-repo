@@ -85,7 +85,8 @@ class VisionAnalysis:
 
     async def _perform_visual_analysis(
         self,
-        part: Part,
+        user_id: str,
+        session_id: str,
         filename: str,
         visual_schema: BaseModel,
         system_instruction: str,
@@ -93,6 +94,26 @@ class VisionAnalysis:
         """Perform visual analysis using LLM with structured output"""
         visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
         For the file "{filename}", provide a comprehensive visual analysis in json format."""
+
+        part = await self.artifact_service.load_artifact(
+            app_name=APP_NAME,
+            user_id=user_id,
+            session_id=session_id,
+            filename=filename,
+            version=None,
+        )
+
+        if not part or not part.inline_data:
+            logger.error(
+                f"Could not load artifact: {filename} from session {session_id}"
+            )
+            raise ValueError(
+                f"Could not load artifact: {filename} from session {session_id}"
+            )
+        else:
+            logger.info(
+                f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"
+            )
 
         llm = OpenAI(model="gpt-5-mini")
 
@@ -157,7 +178,9 @@ class VisionAnalysis:
                         part_summary.update(
                             {
                                 "has_inline_data": True,
-                                "inline_mime_type": getattr(inline_data, "mime_type", None),
+                                "inline_mime_type": getattr(
+                                    inline_data, "mime_type", None
+                                ),
                             }
                         )
                         inline_data_value = getattr(inline_data, "data", None)
@@ -281,33 +304,23 @@ class VisionAnalysis:
                 f"Starting bundled core analysis for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             components_task = self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 VisualComponent,
                 get_component_analysis_instructions(),
             )
             connections_task = self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 VisualConnection,
                 get_connection_analysis_instructions(),
             )
             zones_task = self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 VisualZone,
                 get_zone_analysis_instructions(),
@@ -344,33 +357,23 @@ class VisionAnalysis:
                 f"Starting bundled enhancement analysis for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             technologies_task = self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 TechnologyDetection,
                 get_technology_detection_instructions(),
             )
             classification_task = self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 DiagramClassification,
                 get_diagram_classification_instructions(),
             )
             annotations_task = self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 Annotation,
                 get_annotation_extraction_instructions(),
@@ -408,34 +411,13 @@ class VisionAnalysis:
                 f"Starting visual components analysis for session_id={session_id}, filename={filename}"
             )
 
-            # Load artifact using artifact_service directly
-            logger.info(
-                f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-            )
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                logger.error(f"Could not load artifact")
-                logger.error(
-                    f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-                )
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
-            logger.info(
-                f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"
-            )
-
             # Perform visual analysis for components
             result = await self._perform_visual_analysis(
-                part, filename, VisualComponent, get_component_analysis_instructions()
+                user_id,
+                session_id,
+                filename,
+                VisualComponent,
+                get_component_analysis_instructions(),
             )
             return result
 
@@ -452,34 +434,13 @@ class VisionAnalysis:
                 f"Starting visual connections analysis for session_id={session_id}, filename={filename}"
             )
 
-            # Load artifact using artifact_service directly
-            logger.info(
-                f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-            )
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                logger.error(f"Could not load artifact")
-                logger.error(
-                    f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-                )
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
-            logger.info(
-                f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"
-            )
-
             # Perform visual analysis for connections
             result = await self._perform_visual_analysis(
-                part, filename, VisualConnection, get_connection_analysis_instructions()
+                user_id,
+                session_id,
+                filename,
+                VisualConnection,
+                get_connection_analysis_instructions(),
             )
             return result
 
@@ -496,34 +457,13 @@ class VisionAnalysis:
                 f"Starting visual zones analysis for session_id={session_id}, filename={filename}"
             )
 
-            # Load artifact using artifact_service directly
-            logger.info(
-                f"Loading artifact with params: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-            )
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                logger.error(f"Could not load artifact")
-                logger.error(
-                    f"Load params were: app_name={APP_NAME}, user_id={user_id}, session_id={session_id}, filename={filename}"
-                )
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
-            logger.info(
-                f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"
-            )
-
             # Perform visual analysis for zones
             result = await self._perform_visual_analysis(
-                part, filename, VisualZone, get_zone_analysis_instructions()
+                user_id,
+                session_id,
+                filename,
+                VisualZone,
+                get_zone_analysis_instructions(),
             )
             return result
 
@@ -540,21 +480,12 @@ class VisionAnalysis:
                 f"Starting text extraction for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part, filename, TextExtraction, get_text_extraction_instructions()
+                user_id,
+                session_id,
+                filename,
+                TextExtraction,
+                get_text_extraction_instructions(),
             )
             return result
 
@@ -571,21 +502,9 @@ class VisionAnalysis:
                 f"Starting technology detection for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 TechnologyDetection,
                 get_technology_detection_instructions(),
@@ -605,21 +524,9 @@ class VisionAnalysis:
                 f"Starting diagram classification for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 DiagramClassification,
                 get_diagram_classification_instructions(),
@@ -814,21 +721,12 @@ Infer relationships that are logically implied but not explicitly shown."""
                 f"Starting layout analysis for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part, filename, LayoutStructure, get_layout_analysis_instructions()
+                user_id,
+                session_id,
+                filename,
+                LayoutStructure,
+                get_layout_analysis_instructions(),
             )
             return result
 
@@ -845,21 +743,12 @@ Infer relationships that are logically implied but not explicitly shown."""
                 f"Starting styling analysis for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part, filename, StylingPattern, get_styling_analysis_instructions()
+                user_id,
+                session_id,
+                filename,
+                StylingPattern,
+                get_styling_analysis_instructions(),
             )
             return result
 
@@ -1543,22 +1432,9 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
             logger.info(
                 f"Assessing image quality for session_id={session_id}, filename={filename}"
             )
-
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part,
+                user_id,
+                session_id,
                 filename,
                 ImageQualityAssessment,
                 get_image_quality_assessment_instructions(),
@@ -1578,21 +1454,12 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 f"Identifying regions for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part, filename, ImageRegion, get_region_identification_instructions()
+                user_id,
+                session_id,
+                filename,
+                ImageRegion,
+                get_region_identification_instructions(),
             )
             return result
 
@@ -1600,58 +1467,58 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
             logger.error(f"Failed to identify regions: {e}")
             raise
 
-    async def analyze_by_regions(
-        self, user_id: str, session_id: str, filename: str
-    ) -> str:
-        """Perform region-based analysis for complex diagrams"""
-        try:
-            logger.info(
-                f"Starting region-based analysis for session_id={session_id}, filename={filename}"
-            )
+    # async def analyze_by_regions(
+    #     self, user_id: str, session_id: str, filename: str
+    # ) -> str:
+    #     """Perform region-based analysis for complex diagrams"""
+    #     try:
+    #         logger.info(
+    #             f"Starting region-based analysis for session_id={session_id}, filename={filename}"
+    #         )
 
-            # First, identify regions
-            regions_json = await self.identify_regions(user_id, session_id, filename)
-            regions = json.loads(regions_json)
+    #         # First, identify regions
+    #         regions_json = await self.identify_regions(user_id, session_id, filename)
+    #         regions = json.loads(regions_json)
 
-            if not isinstance(regions, list):
-                raise ValueError("Expected list of regions")
+    #         if not isinstance(regions, list):
+    #             raise ValueError("Expected list of regions")
 
-            # For now, just perform comprehensive analysis on the whole image
-            # In a full implementation, you would:
-            # 1. Split the image into regions
-            # 2. Analyze each region separately
-            # 3. Merge the results
+    #         # For now, just perform comprehensive analysis on the whole image
+    #         # In a full implementation, you would:
+    #         # 1. Split the image into regions
+    #         # 2. Analyze each region separately
+    #         # 3. Merge the results
 
-            logger.info(
-                f"Identified {len(regions)} regions, performing comprehensive analysis"
-            )
+    #         logger.info(
+    #             f"Identified {len(regions)} regions, performing comprehensive analysis"
+    #         )
 
-            # Analyze all regions in parallel (simplified: analyze whole image)
-            components_task = self.analyze_visual_components(
-                user_id, session_id, filename
-            )
-            connections_task = self.analyze_visual_connections(
-                user_id, session_id, filename
-            )
-            zones_task = self.analyze_visual_zones(user_id, session_id, filename)
+    #         # Analyze all regions in parallel (simplified: analyze whole image)
+    #         components_task = self.analyze_visual_components(
+    #             user_id, session_id, filename
+    #         )
+    #         connections_task = self.analyze_visual_connections(
+    #             user_id, session_id, filename
+    #         )
+    #         zones_task = self.analyze_visual_zones(user_id, session_id, filename)
 
-            components_json, connections_json, zones_json = await asyncio.gather(
-                components_task, connections_task, zones_task
-            )
+    #         components_json, connections_json, zones_json = await asyncio.gather(
+    #             components_task, connections_task, zones_task
+    #         )
 
-            result = {
-                "regions": regions,
-                "merged_components": json.loads(components_json),
-                "merged_connections": json.loads(connections_json),
-                "merged_zones": json.loads(zones_json),
-                "overall_quality": 0.85,  # Placeholder
-            }
+    #         result = {
+    #             "regions": regions,
+    #             "merged_components": json.loads(components_json),
+    #             "merged_connections": json.loads(connections_json),
+    #             "merged_zones": json.loads(zones_json),
+    #             "overall_quality": 0.85,  # Placeholder
+    #         }
 
-            return json.dumps(result)
+    #         return json.dumps(result)
 
-        except Exception as e:
-            logger.error(f"Failed region-based analysis: {e}")
-            raise
+    #     except Exception as e:
+    #         logger.error(f"Failed region-based analysis: {e}")
+    #         raise
 
     async def extract_legend_mappings(
         self, user_id: str, session_id: str, filename: str
@@ -1662,21 +1529,12 @@ Use proper mxGraph XML format with accurate positioning and appropriate styles."
                 f"Starting legend extraction for session_id={session_id}, filename={filename}"
             )
 
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
             result = await self._perform_visual_analysis(
-                part, filename, LegendExtraction, get_legend_extraction_instructions()
+                user_id,
+                session_id,
+                filename,
+                LegendExtraction,
+                get_legend_extraction_instructions(),
             )
             return result
 
