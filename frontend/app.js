@@ -180,6 +180,7 @@ class AgentPlatform {
         this.isTyping = false;
         this.processingSessions = new Set(); // Track which sessions are currently processing
         this.toolCallMessages = new Map(); // Track tool calls by ID to match requests and responses
+        this.toolCallStatusById = new Map(); // Track latest pending status per tool call
         this.activeTaskStorageKey = 'activeTaskSubscriptions';
         this.activeTaskSubscriptions = new Map(); // taskId -> subscription metadata
         this.streamContexts = new Map(); // streamId -> context
@@ -1956,6 +1957,7 @@ class AgentPlatform {
 
         // Add running status message to chat if there's a status message
         if (task.status && task.status.message) {
+            this.updateToolCallStatusFromMessage(task.status.message, 'running');
             const attachments = this.extractArtifactRefs(task.status.message);
             this.addMessageToChat({
                 id: task.status.message.messageId || this.generateMessageId(),
@@ -1978,6 +1980,7 @@ class AgentPlatform {
 
         // Add waiting status message to chat if there's a status message
         if (task.status && task.status.message) {
+            this.updateToolCallStatusFromMessage(task.status.message, 'waiting');
             const attachments = this.extractArtifactRefs(task.status.message);
             this.addMessageToChat({
                 id: task.status.message.messageId || this.generateMessageId(),
@@ -1999,6 +2002,7 @@ class AgentPlatform {
 
         const taskId = task.id;
         const status = task.status || {};
+        this.updateToolCallStatusFromMessage(status.message, 'input-required');
         const targetSessionId = sessionId || status.contextId || this.sessionId;
         const attachments = this.extractArtifactRefs(status.message);
         const formattedContent = status.message
@@ -2213,11 +2217,29 @@ class AgentPlatform {
         }
 
         const statusPayload = statusUpdate.status;
-        const targetSessionId = sessionId || statusUpdate.contextId || this.sessionId;
-        const attachments = this.extractArtifactRefs(statusPayload.message);
         const normalizedState = (statusPayload.state || '').toLowerCase();
+        const awaitingLongRunningTool =
+            normalizedState === 'input-required' &&
+            this.isAwaitingLongRunningTool(statusPayload);
+        const displayStatusPayload = awaitingLongRunningTool
+            ? {
+                ...statusPayload,
+                state: 'working'
+            }
+            : statusPayload;
+        const displayStatusUpdate = awaitingLongRunningTool
+            ? { ...statusUpdate, status: displayStatusPayload }
+            : statusUpdate;
+        // Use displayState for toast type to maintain consistency with displayed UI state
+        const displayState = (displayStatusPayload.state || '').toLowerCase();
 
-        if (normalizedState === 'input-required' && statusUpdate.taskId) {
+        const targetSessionId = sessionId || statusUpdate.contextId || this.sessionId;
+        const attachments = this.extractArtifactRefs(displayStatusPayload.message);
+
+        // Update tool call status tracking for all status transitions
+        this.updateToolCallStatusFromMessage(statusPayload.message, normalizedState);
+
+        if (normalizedState === 'input-required' && statusUpdate.taskId && !awaitingLongRunningTool) {
             this.handleTaskInputRequired(
                 { id: statusUpdate.taskId, status: statusPayload },
                 targetSessionId
@@ -2225,32 +2247,36 @@ class AgentPlatform {
             return;
         }
 
-        const heading = this.buildStatusUpdateHeading(statusUpdate);
-        const bodyContent = statusPayload.message
-            ? this.formatA2AMessage(statusPayload.message)
-            : 'Status update received.';
-
-        const messageSegments = [];
-        if (heading) {
-            messageSegments.push(heading);
+        const heading = this.buildStatusUpdateHeading(displayStatusUpdate);
+        
+        // Show status updates as toast by default (submitted, completed, working, etc.)
+        // Only render as card if there's meaningful message content beyond the status
+        const messageContent = displayStatusPayload.message
+            ? this.formatA2AMessage(displayStatusPayload.message)
+            : '';
+        const hasSubstantiveContent = messageContent.trim().length > 0 && 
+            messageContent.trim() !== 'Status update received.';
+        
+        // Always show toast for status updates
+        // Use displayState for toast type to match the displayed UI state (e.g., 'working' instead of 'input-required' for long-running tools)
+        this.showToast(heading || 'Status update received.', this.getToastTypeForState(displayState));
+        
+        // Only render card if there's actual content beyond the status heading
+        // Show card if there's substantive content OR attachments (not requiring both)
+        if (hasSubstantiveContent || attachments.length > 0) {
+            this.addMessageToChat({
+                id: displayStatusPayload.message?.messageId || this.generateMessageId(),
+                type: 'agent',
+                content: messageContent || 'Status update received.',
+                attachments: attachments.length > 0 ? attachments : undefined,
+                timestamp: displayStatusPayload.timestamp || statusUpdate.timestamp || new Date().toISOString(),
+                taskId: statusUpdate.taskId || null
+            }, true, targetSessionId);
         }
-        if (bodyContent) {
-            messageSegments.push(bodyContent);
-        }
-
-        const messageContent = messageSegments.join('\n\n').trim() || 'Status update received.';
-
-        this.addMessageToChat({
-            id: statusPayload.message?.messageId || this.generateMessageId(),
-            type: 'agent',
-            content: messageContent,
-            attachments: attachments.length > 0 ? attachments : undefined,
-            timestamp: statusPayload.timestamp || statusUpdate.timestamp || new Date().toISOString(),
-            taskId: statusUpdate.taskId || null
-        }, true, targetSessionId);
 
         if (statusUpdate.taskId) {
-            this.updateTaskStatus(statusUpdate.taskId, statusPayload);
+            // Use displayStatusPayload to preserve the modified state (e.g., 'working' for long-running tools)
+            this.updateTaskStatus(statusUpdate.taskId, displayStatusPayload);
         }
 
         if (typeof statusUpdate.final === 'boolean') {
@@ -2288,6 +2314,214 @@ class AgentPlatform {
         }
 
         return segments.join(' • ');
+    }
+
+    parseCustomMetadataValue(customMetadata) {
+        if (customMetadata === undefined || customMetadata === null) {
+            return null;
+        }
+
+        if (typeof customMetadata === 'object') {
+            return customMetadata;
+        }
+
+        if (typeof customMetadata === 'string') {
+            return this.tryParseJsonLike(customMetadata);
+        }
+
+        return null;
+    }
+
+    formatStatusMetadata(metadata) {
+        if (!metadata || typeof metadata !== 'object') {
+            return '';
+        }
+
+        const sections = [];
+        const customMetadata = this.stringifyCustomMetadata(metadata.adk_custom_metadata);
+
+        if (customMetadata) {
+            sections.push(`Custom Metadata:\n${customMetadata}`);
+        }
+
+        return sections.join('\n\n').trim();
+    }
+
+    getStatusToastInstruction(customMetadata, statusPayload, normalizedState, heading) {
+        if (!customMetadata || typeof customMetadata !== 'object') {
+            return null;
+        }
+
+        const toBool = (value) => {
+            if (typeof value === 'boolean') {
+                return value;
+            }
+            if (typeof value === 'string') {
+                const normalized = value.trim().toLowerCase();
+                if (normalized === 'true') {
+                    return true;
+                }
+                if (normalized === 'false') {
+                    return false;
+                }
+            }
+            return undefined;
+        };
+
+        const displayHint = (customMetadata.display || customMetadata.displayMode || customMetadata.renderAs || '').toLowerCase();
+        const toastMessageCandidate = [
+            customMetadata.toastMessage,
+            customMetadata.toast_message,
+            customMetadata.message
+        ].find(value => typeof value === 'string' && value.trim().length > 0);
+
+        const explicitToastMessage = typeof customMetadata.toastMessage === 'string' && customMetadata.toastMessage.trim().length > 0;
+        const alternateToastMessage = typeof customMetadata.toast_message === 'string' && customMetadata.toast_message.trim().length > 0;
+
+        const showAsToastFlag = toBool(customMetadata.showAsToast);
+        const toastOnlyFlag = toBool(customMetadata.toastOnly);
+
+        const shouldShowToast =
+            showAsToastFlag === true ||
+            toastOnlyFlag === true ||
+            displayHint === 'toast' ||
+            explicitToastMessage ||
+            alternateToastMessage;
+
+        if (!shouldShowToast) {
+            return null;
+        }
+
+        const fallbackContent = statusPayload?.message
+            ? this.formatA2AMessage(statusPayload.message)
+            : '';
+
+        const toastMessage = (toastMessageCandidate || heading || fallbackContent || 'Status update received.').trim();
+
+        if (!toastMessage) {
+            return null;
+        }
+
+        const toastType =
+            customMetadata.toastType ||
+            customMetadata.toast_type ||
+            customMetadata.toastVariant ||
+            customMetadata.level ||
+            customMetadata.type ||
+            this.getToastTypeForState(normalizedState);
+
+        const skipCard =
+            toastOnlyFlag !== false &&
+            (toastOnlyFlag === true || showAsToastFlag === true || displayHint === 'toast' || explicitToastMessage || alternateToastMessage);
+
+        return {
+            message: toastMessage,
+            type: toastType || 'info',
+            skipCard
+        };
+    }
+
+    stringifyCustomMetadata(customMetadata) {
+        if (customMetadata === undefined || customMetadata === null) {
+            return '';
+        }
+
+        if (typeof customMetadata === 'string') {
+            const parsed = this.tryParseJsonLike(customMetadata);
+            if (parsed) {
+                return JSON.stringify(parsed, null, 2);
+            }
+            return customMetadata;
+        }
+
+        if (typeof customMetadata === 'object') {
+            return JSON.stringify(customMetadata, null, 2);
+        }
+
+        return String(customMetadata);
+    }
+
+    tryParseJsonLike(value) {
+        if (typeof value !== 'string') {
+            return null;
+        }
+
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return null;
+        }
+
+        const attemptParse = (input) => {
+            try {
+                return JSON.parse(input);
+            } catch (e) {
+                return null;
+            }
+        };
+
+        let parsed = attemptParse(trimmed);
+        if (parsed) {
+            return parsed;
+        }
+
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+            return null;
+        }
+
+        const sanitized = trimmed
+            .replace(/<[^:>]+:\s*'([^']*)'>/g, '"$1"')
+            .replace(/([{,]\s*)'([^']+?)'\s*:/g, '$1"$2":')
+            .replace(/:\s*'([^']*?)'(\s*[},])/g, ': "$1"$2')
+            .replace(/\bNone\b/g, 'null')
+            .replace(/\bTrue\b/g, 'true')
+            .replace(/\bFalse\b/g, 'false');
+
+        return attemptParse(sanitized);
+    }
+
+    getToastTypeForState(state) {
+        if (!state || typeof state !== 'string') {
+            return 'info';
+        }
+
+        const normalized = state.toLowerCase();
+
+        if (normalized === 'completed' || normalized === 'success') {
+            return 'success';
+        }
+
+        if (normalized === 'failed' || normalized === 'error') {
+            return 'error';
+        }
+
+        if (normalized === 'input-required') {
+            return 'warning';
+        }
+
+        return 'info';
+    }
+
+    formatMetadataLabel(label) {
+        if (!label || typeof label !== 'string') {
+            return '';
+        }
+
+        return label
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (char) => char.toUpperCase());
+    }
+
+    isAwaitingLongRunningTool(statusPayload) {
+        const parts = statusPayload?.message?.parts;
+        if (!Array.isArray(parts) || parts.length === 0) {
+            return false;
+        }
+
+        return parts.some(part =>
+            part.kind === 'data' &&
+            part.metadata &&
+            part.metadata.adk_is_long_running === true
+        );
     }
 
     getStatusStateIcon(state) {
@@ -2537,6 +2771,7 @@ class AgentPlatform {
         const toolId = toolCall.id || 'N/A';
         const toolArgs = toolCall.args || {};
         const toolResponse = toolCall.response;
+        const pendingState = (toolId && this.toolCallStatusById?.get(toolId)) || 'running';
 
         // Special handling for transfer_to_agent
         if (toolName === 'transfer_to_agent' && toolArgs.agent_name) {
@@ -2603,14 +2838,90 @@ class AgentPlatform {
             pendingSection.innerHTML = `
                 <div class="tool-call-label">Status:</div>
                 <div class="tool-call-content">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <span>Executing...</span>
+                    <i class="tool-call-status-icon ${this.getToolCallStatusIcon(pendingState)}"></i>
+                    <span class="tool-call-status-text">${this.getToolCallStatusLabel(pendingState)}</span>
                 </div>
             `;
             card.appendChild(pendingSection);
         }
 
         return card;
+    }
+
+    getToolCallStatusLabel(state) {
+        switch (state) {
+            case 'input-required':
+                return 'Waiting for user input';
+            case 'waiting':
+                return 'Waiting...';
+            case 'failed':
+                return 'Failed';
+            case 'completed':
+                return 'Completed';
+            case 'running':
+                return 'Executing...';
+            default:
+                return 'Pending...';
+        }
+    }
+
+    getToolCallStatusIcon(state) {
+        switch (state) {
+            case 'input-required':
+                return 'fas fa-question-circle';
+            case 'waiting':
+                return 'fas fa-hourglass-half';
+            case 'failed':
+                return 'fas fa-times-circle';
+            case 'completed':
+                return 'fas fa-check-circle';
+            case 'running':
+                return 'fas fa-spinner fa-spin';
+            default:
+                return 'fas fa-spinner fa-spin';
+        }
+    }
+
+    updateToolCallPendingState(toolCallId, state) {
+        if (!toolCallId || !state) {
+            return;
+        }
+        if (!this.toolCallStatusById) {
+            this.toolCallStatusById = new Map();
+        }
+        this.toolCallStatusById.set(toolCallId, state);
+
+        const card = this.toolCallMessages?.get(toolCallId);
+        if (!card) {
+            return;
+        }
+        const pendingSection = card.querySelector('.tool-call-pending');
+        if (!pendingSection) {
+            return;
+        }
+        const content = pendingSection.querySelector('.tool-call-content');
+        if (!content) {
+            return;
+        }
+        const iconElement = content.querySelector('.tool-call-status-icon');
+        const textElement = content.querySelector('.tool-call-status-text');
+        if (iconElement) {
+            iconElement.className = `tool-call-status-icon ${this.getToolCallStatusIcon(state)}`;
+        }
+        if (textElement) {
+            textElement.textContent = this.getToolCallStatusLabel(state);
+        }
+    }
+
+    updateToolCallStatusFromMessage(message, state) {
+        if (!message || !Array.isArray(message.parts) || !state) {
+            return;
+        }
+        message.parts.forEach(part => {
+            if (part.kind === 'data' && this.isToolCallData(part.data) && part.data.id) {
+                this.updateToolCallPendingState(part.data.id, state);
+            }
+        });
     }
 
     // Format agent name for display
@@ -2651,6 +2962,9 @@ class AgentPlatform {
         
         // Add or update response section (only if response is not null)
         if (toolResponse !== null && toolResponse !== undefined) {
+            if (toolCall.id && this.toolCallStatusById) {
+                this.toolCallStatusById.delete(toolCall.id);
+            }
             let responseSection = card.querySelector('.tool-call-response');
             if (!responseSection) {
                 responseSection = document.createElement('div');
@@ -3264,6 +3578,7 @@ class AgentPlatform {
 
         // Clear tool call messages map to prevent stale references
         this.toolCallMessages.clear();
+        this.toolCallStatusById.clear();
 
         // Hide typing indicator from previous session (new chat means no processing for this session)
         this.hideTypingIndicator();
@@ -3299,6 +3614,7 @@ class AgentPlatform {
                 }
                 // Clear tool call messages map to prevent stale references
                 this.toolCallMessages.clear();
+                this.toolCallStatusById.clear();
                 this.showToast('Chat cleared', 'success');
             }
         );
@@ -3577,6 +3893,7 @@ class AgentPlatform {
 
             // Clear tool call messages map to prevent stale references
             this.toolCallMessages.clear();
+            this.toolCallStatusById.clear();
 
             // Show typing indicator if this session is still processing
             // Hide it if switching to a different session that's not processing

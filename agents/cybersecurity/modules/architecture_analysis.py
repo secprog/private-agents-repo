@@ -10,6 +10,7 @@ from typing import Optional
 
 from google.adk_community.models.openai_llm import OpenAI
 from google.adk.models.llm_request import LlmRequest
+from google.genai import types
 from .prompts import get_comprehensive_security_analysis_instructions
 from .models import ComprehensiveSecurityAnalysis
 
@@ -81,14 +82,25 @@ class ArchitectureAnalysis:
             logger.info(f"Analysis context built: {len(context)} characters")
             
             # Perform security analysis using LLM
-            llm_request = LlmRequest()
-            llm_request.add_text_part(context)
-            llm_request.system_instruction = get_comprehensive_security_analysis_instructions()
+            llm = OpenAI(model="gpt-5.1")
+            llm_request = LlmRequest(
+                model=llm.model,
+                contents=[
+                    types.Content(
+                        role="user",
+                        parts=[types.Part.from_text(text=context)]
+                    )
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=get_comprehensive_security_analysis_instructions(),
+                    max_output_tokens=50000,
+                    response_mime_type="application/json",
+                ),
+            )
             llm_request.set_output_schema(ComprehensiveSecurityAnalysis)
             
             logger.info("Calling LLM for security analysis")
             
-            llm = OpenAI(model="gpt-5.1")
             response = await llm.generate_content_async(llm_request)
             
             # Extract and parse response
