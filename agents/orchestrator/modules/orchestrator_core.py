@@ -14,6 +14,7 @@ from google.adk.agents.remote_a2a_agent import (
     AGENT_CARD_WELL_KNOWN_PATH,
 )
 from google.adk_community.models.openai_llm import OpenAI
+from google.adk.tools import load_memory, preload_memory
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class OrchestratorCore:
         self.agent_id = "orchestrator"
 
         # Initialize ADK workflow agent with basic setup (will be updated after discovery)
-        # Use OpenAILLM
+        # Use OpenAILLM with memory tools for OpenMemory integration
         self.agent_name = self.agent_id.replace("-", "_")
         self.workflow_agent = Agent(
             name=self.agent_name,
@@ -33,6 +34,7 @@ class OrchestratorCore:
             model=OpenAI(model="gpt-5-nano"),
             instruction="Do nothing, just say: I am discovering available sub-agents...",
             sub_agents=[],
+            tools=[preload_memory, load_memory],  # Enable memory tools for OpenMemory
         )
 
         # Agent registry and discovery
@@ -139,15 +141,24 @@ class OrchestratorCore:
                 instruction = (
                     "You are a dispatcher orchestrator. Analyze the user's request and TRANSFER to the most appropriate sub-agent."
                     + "\n"
-                    + "Always TRANSFER to a sub-agent rather than handling requests directly. But you are allowed to greet the user and say hello before transferring to the sub-agent. "
+                    + "Always TRANSFER to a sub-agent rather than handling requests directly. You are allowed to greet the user and say hello before transferring to the sub-agent. If the user's request is not related to any of the sub-agents, say: I am not sure how to help with that. And explain the available sub-agents capabilities to the user, then still TRANSFER to the most appropriate sub-agent if possible."
                     + "\n"
                     + "You are also allowed to explain the user that you are transferring to the sub-agent and that the sub-agent will handle the request, and that you will wait for the sub-agent's response before transferring it to the user."
                     + "\n"
                     + "Do not touch on the sub-agent's response, just transfer it to the user."
                     + "\n"
-                    + "If the user's request is not related to any of the sub-agents, say: I am not sure how to help with that. And explain the avaliable sub-agents capabilities to the user. " 
-                    + "\n"
                     + "Also you can ask the user to provide more information about the request. If the user provides more information, you can transfer to the sub-agent again."
+                    + "\n"
+                    + "\n"
+                    + "MEMORY CAPABILITIES:"
+                    + "\n"
+                    + "You have access to memory tools (load_memory, preload_memory) that allow you to remember past conversations and user preferences."
+                    + "\n"
+                    + "- Use load_memory to search for relevant information from past conversations when needed."
+                    + "\n"
+                    + "- Use preload_memory to proactively load relevant memories at the start of a conversation."
+                    + "\n"
+                    + "- This helps you provide better context-aware routing and maintain continuity across sessions."
                 )
             else:
                 instruction = "Do nothing just say: No specialized sub-agents are currently available."

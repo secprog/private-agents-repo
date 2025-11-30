@@ -15,7 +15,7 @@ from modules.orchestrator_core import OrchestratorCore
 from google.adk.artifacts import FileArtifactService
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.runners import Runner
-from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+from google.adk_community.memory import OpenMemoryService
 from google.adk.auth.credential_service.in_memory_credential_service import (
     InMemoryCredentialService,
 )
@@ -29,7 +29,10 @@ logger = logging.getLogger(__name__)
 artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts"))
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
 db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
-
+# Get OpenMemory configuration from environment variables
+# Use OM_BASE_URL (from docker-compose) with fallback to OPENMEMORY_BASE_URL for backward compatibility
+mem_url = os.getenv("OM_BASE_URL", "http://openmemory:8765")
+mem_api_key = os.getenv("OM_API_KEY")
 # Convert postgresql:// to postgresql+psycopg:// for async support
 if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
@@ -80,7 +83,7 @@ app = to_a2a(
         app=orchestrator_app,
         artifact_service=artifact_service,
         session_service=session_service,
-        memory_service=InMemoryMemoryService(),
+        memory_service=OpenMemoryService(base_url=mem_url, api_key=mem_api_key),
         credential_service=InMemoryCredentialService(),
     ),
     task_store=DatabaseTaskStore(engine=engine),

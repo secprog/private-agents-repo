@@ -5,7 +5,7 @@ env/
 ENV/
 .venv/
 .env/
-
+openmemory/api
 # Python
 __pycache__/
 *.py[cod]

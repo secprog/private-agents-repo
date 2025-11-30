@@ -24,6 +24,8 @@ services:
     ports:
       - "${ORCHESTRATOR_PORT:-8000}:8000"
     environment:
+      - OM_BASE_URL=${OM_BASE_URL:-http://localhost:8765}
+      - OM_API_KEY=${OM_API_KEY}	
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
@@ -102,9 +104,75 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
+  # OpenMemory (self-hosted) - lightweight memory service used by ADK adapters
+  # Setup instructions (see openmemory/README.md for details):
+  #   1. Clone: git clone https://github.com/mem0ai/mem0.git
+  #   2. Copy: cp -r mem0/openmemory/api/* ./openmemory/api/
+  #   3. Set required environment variables in .env file
+  #   4. API available at: http://localhost:8765
+  # Note: For multi-user support, pass user_id in API requests (not via env var)
+  openmemory:
+    build:
+      context: ./openmemory/api
+      dockerfile: Dockerfile
+    container_name: ${OPENMEMORY_CONTAINER:-openmemory}
+    restart: always
+    ports:
+      - "${OM_PORT:-8765}:8765"
+    environment:
+      # Core Configuration (REQUIRED for production)
+      - OM_PORT=${OM_PORT:-8765}
+      - OM_API_KEY=${OM_API_KEY:-}  # REQUIRED for production - API key for authentication
+      - OM_TIER=${OM_TIER:-hybrid}  # Performance tier: hybrid, smart, deep, or fast
+      
+      # Database Configuration
+      - OM_METADATA_BACKEND=${OM_METADATA_BACKEND:-postgres}
+      - OM_VECTOR_BACKEND=${OM_VECTOR_BACKEND:-pgvector}
+      
+      # Embedding Provider Configuration
+      - OM_EMBEDDINGS=${OM_EMBEDDINGS:-openai}  # Options: synthetic, openai, gemini, ollama, aws
+      
+      # OpenAI Embedding Configuration (REQUIRED if OM_EMBEDDINGS=openai)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}  # REQUIRED for OpenAI embeddings
+      - OM_OPENAI_BASE_URL=${OM_OPENAI_BASE_URL:-}
+      
+      # PostgreSQL Configuration (if using PostgreSQL for metadata/vector)
+      - OM_POSTGRES_HOST=${OM_POSTGRES_HOST:-postgres}
+      - OM_POSTGRES_PORT=${OM_POSTGRES_PORT:-5432}
+      - OM_POSTGRES_DB=${POSTGRES_DB:-openmemory}
+      - OM_POSTGRES_USER=${POSTGRES_USER:-}
+      - OM_POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-}
+      
+      # Background Process Configuration
+      - OM_AUTO_REFLECT=${OM_AUTO_REFLECT:-true}
+      - OM_REFLECT_INTERVAL=${OM_REFLECT_INTERVAL:-3600}
+      - OM_REFLECT_MIN_MEMORIES=${OM_REFLECT_MIN_MEMORIES:-10}
+      - OM_USER_SUMMARY_INTERVAL=${OM_USER_SUMMARY_INTERVAL:-86400}
+      - OM_USE_SUMMARY_ONLY=${OM_USE_SUMMARY_ONLY:-false}
+      - OM_SUMMARY_MAX_LENGTH=${OM_SUMMARY_MAX_LENGTH:-2000}
+      
+      # Memory Decay Configuration
+      - OM_DECAY_LAMBDA=${OM_DECAY_LAMBDA:-0.1}
+      - OM_DECAY_INTERVAL_MINUTES=${OM_DECAY_INTERVAL_MINUTES:-60}
+      - OM_DECAY_RATIO=${OM_DECAY_RATIO:-0.1}
+      - OM_DECAY_SLEEP_MS=${OM_DECAY_SLEEP_MS:-100}
+      - OM_DECAY_THREADS=${OM_DECAY_THREADS:-4}
+      - OM_DECAY_COLD_THRESHOLD=${OM_DECAY_COLD_THRESHOLD:-0.1}
+      - OM_DECAY_REINFORCE_ON_QUERY=${OM_DECAY_REINFORCE_ON_QUERY:-true}
+      
+    networks:
+      - agent-network
+    volumes:
+      - openmemory_data:/data
+      # Mount the API code for development (adjust path as needed)
+      # - ./openmemory/api:/app
+    depends_on:
+      - postgres
+
 networks:
   agent-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  openmemory_data:
