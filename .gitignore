@@ -5,7 +5,11 @@ env/
 ENV/
 .venv/
 .env/
-openmemory/api
+openmemory/*
+!openmemory/Dockerfile
+!openmemory/setup-openmemory.sh
+!openmemory/setup-openmemory.cmd
+!openmemory/setup-openmemory.ps1
 # Python
 __pycache__/
 *.py[cod]

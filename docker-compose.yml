@@ -24,7 +24,7 @@ services:
     ports:
       - "${ORCHESTRATOR_PORT:-8000}:8000"
     environment:
-      - OM_BASE_URL=${OM_BASE_URL:-http://localhost:8765}
+      - OM_BASE_URL=${OM_BASE_URL:-http://openmemory:8080}
       - OM_API_KEY=${OM_API_KEY}	
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
@@ -104,24 +104,26 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
-  # OpenMemory (self-hosted) - lightweight memory service used by ADK adapters
-  # Setup instructions (see openmemory/README.md for details):
-  #   1. Clone: git clone https://github.com/mem0ai/mem0.git
-  #   2. Copy: cp -r mem0/openmemory/api/* ./openmemory/api/
-  #   3. Set required environment variables in .env file
-  #   4. API available at: http://localhost:8765
-  # Note: For multi-user support, pass user_id in API requests (not via env var)
+  # OpenMemory (CaviraOSS) - cognitive memory engine for AI agents
+  # See: https://github.com/CaviraOSS/OpenMemory
+  # Setup instructions:
+  #   1. Clone: git clone https://github.com/CaviraOSS/OpenMemory.git
+  #   2. Set required environment variables in .env file
+  #   3. API available at: http://localhost:8080
+  # Note: CaviraOSS OpenMemory runs on port 8080 by default
   openmemory:
     build:
-      context: ./openmemory/api
+      context: ./openmemory
       dockerfile: Dockerfile
+    # Note: Run setup-openmemory script first to clone CaviraOSS OpenMemory backend
+    # The backend files will be copied directly to ./openmemory/ after setup
     container_name: ${OPENMEMORY_CONTAINER:-openmemory}
     restart: always
     ports:
-      - "${OM_PORT:-8765}:8765"
+      - "${OM_PORT:-8080}:8080"
     environment:
       # Core Configuration (REQUIRED for production)
-      - OM_PORT=${OM_PORT:-8765}
+      - PORT=${OM_PORT:-8080}
       - OM_API_KEY=${OM_API_KEY:-}  # REQUIRED for production - API key for authentication
       - OM_TIER=${OM_TIER:-hybrid}  # Performance tier: hybrid, smart, deep, or fast
       
@@ -164,8 +166,8 @@ services:
       - agent-network
     volumes:
       - openmemory_data:/data
-      # Mount the API code for development (adjust path as needed)
-      # - ./openmemory/api:/app
+      # Mount the backend code for development (if needed)
+      # - ./openmemory/backend:/usr/src/openmemory
     depends_on:
       - postgres
 

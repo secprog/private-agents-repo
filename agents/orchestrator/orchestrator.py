@@ -31,7 +31,7 @@ artifact_service = FileArtifactService(root_dir=os.getenv("ARTIFACT_ROOT_DIR", "
 db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/agent_platform")
 # Get OpenMemory configuration from environment variables
 # Use OM_BASE_URL (from docker-compose) with fallback to OPENMEMORY_BASE_URL for backward compatibility
-mem_url = os.getenv("OM_BASE_URL", "http://openmemory:8765")
+mem_url = os.getenv("OM_BASE_URL", "http://openmemory:8080")
 mem_api_key = os.getenv("OM_API_KEY")
 # Convert postgresql:// to postgresql+psycopg:// for async support
 if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
