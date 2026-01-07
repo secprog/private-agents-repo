@@ -1,7 +1,7 @@
 # Google ADK SDK and A2A Protocol
 google-adk @ git+https://github.com/secprog/adk-python@main
 google-adk-community @ git+https://github.com/secprog/adk-python-community@main
-paddleocr-mcp @ https://paddle-model-ecology.bj.bcebos.com/paddlex/PaddleX3.0/mcp/paddleocr_mcp/releases/v0.2.1/paddleocr_mcp-0.2.1-py3-none-any.whl
+#paddleocr-mcp @ https://paddle-model-ecology.bj.bcebos.com/paddlex/PaddleX3.0/mcp/paddleocr_mcp/releases/v0.2.1/paddleocr_mcp-0.2.1-py3-none-any.whl
 
 a2a-sdk[all]>=0.3.11
 
