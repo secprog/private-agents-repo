@@ -20,7 +20,8 @@ fi
 # Set paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-TEMP_CLONE="/tmp/openmemory-cavira-clone"
+# Use local temp directory to avoid Windows path mapping issues in runners
+TEMP_CLONE="./.tmp-openmemory-clone"
 
 echo "Step 1: Cloning CaviraOSS OpenMemory repository..."
 echo ""
