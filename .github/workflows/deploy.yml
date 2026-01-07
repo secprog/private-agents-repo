@@ -12,6 +12,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup OpenMemory
+        shell: bash
+        run: |
+          cd openmemory
+          chmod +x setup-openmemory.sh
+          ./setup-openmemory.sh
+
       - name: Create .env file
         shell: bash
         run: |
