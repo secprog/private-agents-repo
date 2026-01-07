@@ -42,20 +42,20 @@ echo ""
 echo "Step 2: Copying backend files..."
 echo ""
 
-# Check if backend directory exists in the clone
-if [ ! -d "$TEMP_CLONE/backend" ]; then
-    echo "ERROR: backend directory not found in cloned repository."
-    rm -rf "$TEMP_CLONE"
-    exit 1
-fi
+# Copy repository files directly to openmemory directory
+echo "Copying files from OpenMemory root to openmemory/..."
+# Copy all files from temp clone to script dir (excluding .git)
+# Note: In bash, dotglob needs to be enabled to match hidden files with *, or use specific patterns.
+# Since we are in a script, we use a simpler approach: rsync or specific copying.
+# However, assuming standard cp -r, we want everything.
 
-# Copy backend files directly to openmemory directory (not to a subfolder)
-echo "Copying files from OpenMemory/backend to openmemory/..."
-if ! cp -r "$TEMP_CLONE/backend"/* "$SCRIPT_DIR/"; then
+if ! cp -r "$TEMP_CLONE"/* "$SCRIPT_DIR/"; then
     echo "ERROR: Failed to copy backend files."
     rm -rf "$TEMP_CLONE"
     exit 1
 fi
+# Try to copy hidden files too (like .env.example) if they didn't copy
+cp -r "$TEMP_CLONE"/.[!.]* "$SCRIPT_DIR/" 2>/dev/null || true
 
 echo ""
 echo "Step 3: Cleaning up temporary files..."
