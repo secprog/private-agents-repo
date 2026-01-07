@@ -1,0 +1,35 @@
+name: Deploy Application
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+            echo "Created .env from secrets"
+          elif [ -f "docker.env" ]; then
+            cp docker.env .env
+            echo "Warning: Created .env from docker.env template. For production, set ENV_FILE secret."
+          else
+            echo "No .env source found"
+          fi
+
+      - name: Build Services
+        run: docker compose -f docker-compose.yml build --no-cache
+
+      - name: Start Services
+        run: docker compose -f docker-compose.yml up -d --force-recreate
+
+      - name: Prune Unused Images
+        run: docker image prune -f
