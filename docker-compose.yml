@@ -15,7 +15,6 @@ services:
     networks:
       - agent-network
 
-
   # Main Orchestrator Agent
   orchestrator:
     build: ./agents/orchestrator
@@ -25,7 +24,7 @@ services:
       - "${ORCHESTRATOR_PORT:-8000}:8000"
     environment:
       - OM_BASE_URL=${OM_BASE_URL:-http://openmemory:8080}
-      - OM_API_KEY=${OM_API_KEY}	
+      - OM_API_KEY=${OM_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
@@ -113,7 +112,7 @@ services:
   # Note: CaviraOSS OpenMemory runs on port 8080 by default
   openmemory:
     build:
-      context: ./openmemory
+      context: ./packages/openmemory-js
       dockerfile: Dockerfile
     # Note: Run setup-openmemory script first to clone CaviraOSS OpenMemory backend
     # The backend files will be copied directly to ./openmemory/ after setup
@@ -124,28 +123,28 @@ services:
     environment:
       # Core Configuration (REQUIRED for production)
       - PORT=${OM_PORT:-8080}
-      - OM_API_KEY=${OM_API_KEY:-}  # REQUIRED for production - API key for authentication
-      - OM_TIER=${OM_TIER:-deep}  # Performance tier: hybrid, smart, deep, or fast
-      
+      - OM_API_KEY=${OM_API_KEY:-} # REQUIRED for production - API key for authentication
+      - OM_TIER=${OM_TIER:-deep} # Performance tier: hybrid, smart, deep, or fast
+
       # Database Configuration
       - OM_METADATA_BACKEND=${OM_METADATA_BACKEND:-postgres}
       - OM_VECTOR_BACKEND=${OM_VECTOR_BACKEND:-pgvector}
-      
+
       # Embedding Provider Configuration
-      - OM_EMBEDDINGS=${OM_EMBEDDINGS:-openai}  # Options: synthetic, openai, gemini, ollama, aws
-      
+      - OM_EMBEDDINGS=${OM_EMBEDDINGS:-openai} # Options: synthetic, openai, gemini, ollama, aws
+
       # OpenAI Embedding Configuration (REQUIRED if OM_EMBEDDINGS=openai)
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}  # REQUIRED for OpenAI embeddings
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-} # REQUIRED for OpenAI embeddings
       - OM_OPENAI_BASE_URL=${OM_OPENAI_BASE_URL:-}
-      
+
       # PostgreSQL Configuration (if using PostgreSQL for metadata/vector)
       - OM_PG_HOST=${OM_PG_HOST:-postgres}
       - OM_PG_PORT=${OM_PG_PORT:-5432}
       - OM_PG_DB=${POSTGRES_DB:-openmemory}
       - OM_PG_USER=${POSTGRES_USER:-}
       - OM_PG_PASSWORD=${POSTGRES_PASSWORD:-}
-      - OM_VECTOR_TABLE=vectors  # Must match PostgresVectorStore hardcoded table name
-      
+      - OM_VECTOR_TABLE=vectors # Must match PostgresVectorStore hardcoded table name
+
       # Background Process Configuration
       - OM_AUTO_REFLECT=${OM_AUTO_REFLECT:-true}
       - OM_REFLECT_INTERVAL=${OM_REFLECT_INTERVAL:-3600}
@@ -153,7 +152,7 @@ services:
       - OM_USER_SUMMARY_INTERVAL=${OM_USER_SUMMARY_INTERVAL:-86400}
       - OM_USE_SUMMARY_ONLY=${OM_USE_SUMMARY_ONLY:-false}
       - OM_SUMMARY_MAX_LENGTH=${OM_SUMMARY_MAX_LENGTH:-2000}
-      
+
       # Memory Decay Configuration
       - OM_DECAY_LAMBDA=${OM_DECAY_LAMBDA:-0.1}
       - OM_DECAY_INTERVAL_MINUTES=${OM_DECAY_INTERVAL_MINUTES:-60}
@@ -162,7 +161,7 @@ services:
       - OM_DECAY_THREADS=${OM_DECAY_THREADS:-4}
       - OM_DECAY_COLD_THRESHOLD=${OM_DECAY_COLD_THRESHOLD:-0.1}
       - OM_DECAY_REINFORCE_ON_QUERY=${OM_DECAY_REINFORCE_ON_QUERY:-true}
-      
+
     networks:
       - agent-network
     volumes:

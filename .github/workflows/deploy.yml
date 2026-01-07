@@ -12,12 +12,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup OpenMemory
-        shell: bash
-        run: |
-          cd openmemory
-          chmod +x setup-openmemory.sh
-          ./setup-openmemory.sh
+      - name: Clone OpenMemory
+        uses: actions/checkout@v4
+        with:
+          repository: CaviraOSS/OpenMemory
+          path: openmemory
 
       - name: Create .env file
         shell: bash
