@@ -1,5 +1,7 @@
 # Agent Platform - Multi-Agent AI System
 
+[![Deploy Application](https://github.com/secprog/private-agents-repo/actions/workflows/deploy.yml/badge.svg)](https://github.com/secprog/private-agents-repo/actions/workflows/deploy.yml)
+
 A comprehensive multi-agent AI platform built with Google ADK SDK and A2A protocol for agent-to-agent communication. The platform features a master orchestrator that intelligently routes tasks to specialized agents, with full support for chat history, memory, and file attachments.
 
 ## 🌟 Features
