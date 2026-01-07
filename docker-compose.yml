@@ -112,7 +112,7 @@ services:
   # Note: CaviraOSS OpenMemory runs on port 8080 by default
   openmemory:
     build:
-      context: ./packages/openmemory-js
+      context: ./openmemory/packages/openmemory-js
       dockerfile: Dockerfile
     # Note: Run setup-openmemory script first to clone CaviraOSS OpenMemory backend
     # The backend files will be copied directly to ./openmemory/ after setup
