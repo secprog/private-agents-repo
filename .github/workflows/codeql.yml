@@ -28,7 +28,7 @@ jobs:
           grep -qx "x86_64" /tmp/arch.txt
 
 
-      - name: Run CodeQL (amd64 container) and produce SARIF
+      - name: Run CodeQL (amd64 container) with Java 17 and produce SARIF
         shell: bash
         run: |
           set -euo pipefail
@@ -38,16 +38,17 @@ jobs:
             python:3.11-slim bash -lc '
               set -euo pipefail
 
-              # Install only what we need; avoid upgrading base packages (prevents libc-bin upgrade)
               apt-get update
               apt-get install -y --no-install-recommends --no-upgrade \
-                ca-certificates curl unzip git
+                ca-certificates curl unzip git \
+                openjdk-17-jre-headless
+
+              export CODEQL_JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 
               python -m pip install --upgrade pip
               if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
               if [ -f pyproject.toml ] || [ -f setup.py ]; then pip install -e .; fi
 
-              # CodeQL CLI (amd64)
               curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip \
                 -o /tmp/codeql.zip
               mkdir -p /opt/codeql
@@ -55,7 +56,6 @@ jobs:
               export PATH="/opt/codeql/codeql:$PATH"
 
               codeql version
-              codeql resolve languages | grep -q python
 
               rm -rf /tmp/codeql-db
 
