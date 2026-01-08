@@ -10,7 +10,10 @@ jobs:
     runs-on: self-hosted
     permissions:
       contents: read
-
+    
+    env:
+      CODEQL_ALLOW_INSTALLATION_ANYWHERE: "true"
+    
     steps:
       - uses: actions/checkout@v4
       
@@ -33,6 +36,7 @@ jobs:
             --language=python \
             --source-root . \
             --no-calculate-baseline
+ 
       - name: Analyze -> SARIF
         shell: bash
         run: |
