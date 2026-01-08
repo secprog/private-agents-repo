@@ -49,7 +49,7 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 15
     needs: deploy
-    if: ${{ needs.deploy.conclusion == 'failure' || needs.deploy.conclusion == 'timed_out' }}
+    if: ${{ needs.deploy.conclusion == 'failure' || needs.deploy.conclusion == 'timed_out' || needs.deploy.conclusion == 'cancelled' }}
     steps:
       - name: Stop Running Services
         run: docker compose -f docker-compose.yml down --remove-orphans || true
