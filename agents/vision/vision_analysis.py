@@ -92,6 +92,27 @@ class VisionAnalysis:
         system_instruction: str,
     ) -> str:
         """Perform visual analysis using LLM with structured output"""
+        def _is_missing(value: str) -> bool:
+            """Detect empty or placeholder context values."""
+            if value is None:
+                return True
+            if isinstance(value, str):
+                cleaned = value.strip().lower()
+                return cleaned in {"", "unknown", "none", "null", "undefined"}
+            return False
+
+        # Guard against missing context so the LLM isn't called with placeholders
+        if _is_missing(user_id) or _is_missing(session_id) or _is_missing(filename):
+            logger.warning(
+                "Visual analysis requested without required artifact context "
+                f"(user_id={user_id}, session_id={session_id}, filename={filename})"
+            )
+            return json.dumps(
+                {
+                    "error": "NO_IMAGE_PROVIDED",
+                    "message": "Please upload/select an image before requesting visual analysis.",
+                }
+            )
         visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
         For the file "{filename}", provide a comprehensive visual analysis in json format."""
 
@@ -107,9 +128,12 @@ class VisionAnalysis:
             logger.error(
                 f"Could not load artifact: {filename} from session {session_id}"
             )
-            raise ValueError(
-                f"Could not load artifact: {filename} from session {session_id}"
-            )
+            # Return a JSON error that can be gracefully handled by the frontend/agent
+            return json.dumps({
+                "error": f"Could not load artifact: {filename}", 
+                "message": "Please make sure you have uploaded an image before asking for analysis.",
+                "code": "ARTIFACT_NOT_FOUND" 
+            })
         else:
             logger.info(
                 f"Successfully loaded artifact: {filename} (type: {part.inline_data.mime_type})"

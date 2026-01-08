@@ -8,12 +8,9 @@ on:
 jobs:
   deploy:
     runs-on: self-hosted
-    timeout-minutes: 15
+    timeout-minutes: 60
     continue-on-error: true
     steps:
-      - name: Stop Running Services
-        run: docker compose -f docker-compose.yml down --remove-orphans || true
-
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -38,46 +35,13 @@ jobs:
 
       - name: Build Services
         run: docker compose -f docker-compose.yml build --no-cache
-
+        timeout-minutes: 15
+      
       - name: Start Services
         run: docker compose -f docker-compose.yml up -d --force-recreate
+        timeout-minutes: 5
+        continue-on-error: true
 
       - name: Prune Unused Images
         run: docker image prune -f
-
-  deploy_retry:
-    runs-on: self-hosted
-    timeout-minutes: 15
-    needs: deploy
-    if: ${{ needs.deploy.conclusion == 'failure' || needs.deploy.conclusion == 'timed_out' || needs.deploy.conclusion == 'cancelled' }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Clone OpenMemory
-        uses: actions/checkout@v4
-        with:
-          repository: CaviraOSS/OpenMemory
-          path: openmemory
-
-      - name: Create .env file
-        shell: bash
-        run: |
-          if [ -n "${{ secrets.ENV_FILE }}" ]; then
-            echo "${{ secrets.ENV_FILE }}" > .env
-            echo "Created .env from secrets"
-          elif [ -f "docker.env" ]; then
-            cp docker.env .env
-            echo "Warning: Created .env from docker.env template. For production, set ENV_FILE secret."
-          else
-            echo "No .env source found"
-          fi
-
-      - name: Build Services
-        run: docker compose -f docker-compose.yml build --no-cache
-
-      - name: Start Services
-        run: docker compose -f docker-compose.yml up -d --force-recreate
-
-      - name: Prune Unused Images
-        run: docker image prune -f
+        timeout-minutes: 5

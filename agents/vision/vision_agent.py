@@ -100,6 +100,12 @@ IMPORTANT EXECUTION RULES:
 - Call enhancement tools (6-8) only if you need to re-run a specific one
 - Use quality assessment (tool 14) before analysis for complex or unclear images
 - Export tools (16-18) require JSON inputs from previous analysis
+- Export tools (16-18) require JSON inputs from previous analysis
+
+CRITICAL PRE-CONDITION:
+- You CANNOT perform analysis without a file.
+- If no file/image is provided in the context, DO NOT call any analysis tools.
+- Instead, politely ask the user to provide an image or file to analyze.
 """,
     tools=[
         # Core analysis bundle
@@ -158,9 +164,15 @@ root_agent = Agent(
 Workflow:
 - For visual analysis: Delegate to visual_analyzer (it uses run_core_analysis_parallel to gather core data up front)
 - For merging results: Delegate to merge_visual_analysis
-- You do not touch sub-agent's input or output, you only delegate to them.""",
-    sub_agents=[visual_analysis_agent, merger],
-    planner=plan_re_act_planner.PlanReActPlanner(),
+- You do not touch sub-agent's input or output, you only delegate to them.
+
+IMPORTANT GUARDRAILS:
+- If the user is just saying hello or asking a general question NOT related to analyzing a specific image/file, YOU should respond directly with a brief reply.
+- ONLY delegate to tools if the user has provided a file/image or is explicitly asking to analyze a previously provided one.
+- NEVER call any tools when filename/session_id/user_id are missing or unknown. When unsure, do not call tools; ask for an image instead.
+- If no file is present, ask the user to provide one and stop. Do not attempt quality assessment with placeholder values.""",
+   sub_agents=[visual_analysis_agent, merger],
+   planner=plan_re_act_planner.PlanReActPlanner(),
 )
 
 vision_app = App(

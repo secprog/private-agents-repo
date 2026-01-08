@@ -100,16 +100,31 @@ class ArchitectureAnalysis:
             llm_request.set_output_schema(ComprehensiveSecurityAnalysis)
             
             logger.info("Calling LLM for security analysis")
-            
-            response = await llm.generate_content_async(llm_request)
-            
+
+            # generate_content_async returns an async generator even when stream=False
+            response_text = ""
+            async for llm_response in llm.generate_content_async(
+                llm_request, stream=False
+            ):
+                error_message = getattr(llm_response, "error_message", None)
+                if error_message:
+                    error_code = getattr(llm_response, "error_code", None)
+                    prefix = f"{error_code}: " if error_code else ""
+                    raise ValueError(f"{prefix}{error_message}")
+
+                if llm_response.content and llm_response.content.parts:
+                    for part in llm_response.content.parts:
+                        text_value = getattr(part, "text", None)
+                        if text_value:
+                            response_text += text_value
+
             # Extract and parse response
-            if not response or not response.text:
+            if not response_text:
                 raise ValueError("Empty response from LLM")
             
             # Parse and validate JSON
             try:
-                security_analysis = json.loads(response.text)
+                security_analysis = json.loads(response_text)
                 logger.info(
                     f"Security analysis complete: "
                     f"{len(security_analysis.get('threats', []))} threats, "
@@ -117,10 +132,10 @@ class ArchitectureAnalysis:
                     f"{len(security_analysis.get('attack_paths', []))} attack paths, "
                     f"{len(security_analysis.get('recommendations', []))} recommendations"
                 )
-                return response.text
+                return response_text
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse LLM response as JSON: {e}")
-                logger.error(f"Response text: {response.text[:500]}...")
+                logger.error(f"Response text: {response_text[:500]}...")
                 raise
                 
         except Exception as e:
