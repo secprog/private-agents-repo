@@ -13,7 +13,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-          
+      
+      - name: Force CodeQL to use native ARM64 Java
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAVA_BIN="$(readlink -f "$(command -v java)")"
+          JAVA_HOME_DIR="$(dirname "$(dirname "$JAVA_BIN")")"
+          echo "CODEQL_JAVA_HOME=$JAVA_HOME_DIR" >> "$GITHUB_ENV"
+          echo "Using CODEQL_JAVA_HOME=$JAVA_HOME_DIR"
+          "$JAVA_BIN" -version          
+      
       - name: Create CodeQL database (Python)
         shell: bash
         run: |
