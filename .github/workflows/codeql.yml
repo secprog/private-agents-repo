@@ -1,29 +1,96 @@
+name: codeql-python-x64-emulation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
 jobs:
   codeql:
     runs-on: self-hosted
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run CodeQL in amd64 container
+      # 1) Enable amd64 emulation on the ARM64 host (requires Docker + --privileged allowed)
+      - name: Enable binfmt (QEMU) for amd64
+        shell: bash
         run: |
+          set -euo pipefail
+          docker run --rm --privileged tonistiigi/binfmt --install amd64
+
+      - name: Sanity check amd64 containers run
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --platform=linux/amd64 alpine:3.19 uname -m | tee /tmp/arch.txt
+          grep -qx "x86_64" /tmp/arch.txt
+
+      # 2) Run CodeQL inside an amd64 container, generate SARIF (no GHAS upload)
+      - name: Run CodeQL (amd64 container) and produce SARIF
+        shell: bash
+        run: |
+          set -euo pipefail
+
           docker run --rm --platform=linux/amd64 \
-            -v "$PWD:/work" -w /work ubuntu:22.04 bash -lc '
-              apt update &&
-              apt install -y curl unzip python3 python3-pip &&
-              curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-bundle-linux64.tar.gz -o /tmp/codeql.tgz &&
-              mkdir /opt/codeql &&
-              tar -xzf /tmp/codeql.tgz -C /opt/codeql &&
-              export PATH=/opt/codeql/codeql:$PATH &&
+            -v "$PWD:/work" -w /work \
+            ubuntu:22.04 bash -lc '
+              set -euo pipefail
 
-              if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi &&
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                ca-certificates curl unzip \
+                python3 python3-pip \
+                git
 
-              codeql database create db --language=python --source-root . &&
-              codeql database analyze db codeql/python-queries \
-                --format=sarifv2.1.0 --output=codeql.sarif
+              python3 -m pip install --upgrade pip
+              if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
+              if [ -f pyproject.toml ] || [ -f setup.py ]; then pip3 install -e .; fi
+
+              # Download official x64 CodeQL bundle (ZIP)
+              curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip \
+                -o /tmp/codeql.zip
+
+              mkdir -p /opt/codeql
+              unzip -q /tmp/codeql.zip -d /opt/codeql
+              export PATH="/opt/codeql/codeql:$PATH"
+
+              codeql version
+              codeql resolve languages | grep -q python
+
+              rm -rf /tmp/codeql-db
+
+              codeql database create /tmp/codeql-db \
+                --language=python \
+                --source-root /work
+
+              codeql database analyze /tmp/codeql-db \
+                codeql/python-queries \
+                --format=sarifv2.1.0 \
+                --output=/work/codeql-results.sarif \
+                --sarif-category=codeql \
+                --threads=0 \
+                --download
             '
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload SARIF artifact
+        uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif
-          path: codeql.sarif
+          path: codeql-results.sarif
+
+      # 3) Optional: fail CI if findings exist
+      - name: Fail on findings (optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - << 'PY'
+          import json
+          with open("codeql-results.sarif","r",encoding="utf-8") as f:
+            sarif=json.load(f)
+          results=sum(len(r.get("results",[])) for r in sarif.get("runs",[]))
+          print("CodeQL results:", results)
+          raise SystemExit(2 if results else 0)
+          PY
