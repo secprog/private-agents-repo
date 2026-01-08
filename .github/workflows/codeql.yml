@@ -28,7 +28,7 @@ jobs:
           grep -qx "x86_64" /tmp/arch.txt
 
 
-      - name: Run CodeQL (amd64 container) with Java 17 and produce SARIF
+      - name: Run CodeQL (amd64 container) with Java 21 and produce SARIF
         shell: bash
         run: |
           set -euo pipefail
@@ -41,9 +41,9 @@ jobs:
               apt-get update
               apt-get install -y --no-install-recommends --no-upgrade \
                 ca-certificates curl unzip git \
-                openjdk-17-jre-headless
+                openjdk-21-jdk-headless
 
-              export CODEQL_JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+              export CODEQL_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 
               python -m pip install --upgrade pip
               if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
