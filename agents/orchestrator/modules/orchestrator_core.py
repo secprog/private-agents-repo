@@ -6,15 +6,19 @@ import os
 import logging
 import time
 import requests
-from typing import List
+from typing import List, cast
 
-from google.adk.agents import Agent
+from google.adk.agents import Agent, BaseAgent
 from google.adk.agents.remote_a2a_agent import (
     RemoteA2aAgent,
     AGENT_CARD_WELL_KNOWN_PATH,
 )
-from google.adk_community.models.openai_llm import OpenAI
+from google.adk.models import LiteLlm
+
 from google.adk.tools import load_memory, preload_memory
+
+# Model constants
+LLM_MODEL = os.getenv("LLM_MODEL")
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +35,7 @@ class OrchestratorCore:
         self.workflow_agent = Agent(
             name=self.agent_name,
             description="Master orchestrator for routing tasks to specialized agents",
-            model=OpenAI(model="gpt-5-mini"),
+            model=LiteLlm(model="openai/gpt-5-nano"),  # Temporary model before discovery
             instruction="Do nothing, just say: I am discovering available sub-agents...",
             sub_agents=[],
             tools=[preload_memory, load_memory],  # Enable memory tools for OpenMemory
@@ -164,8 +168,9 @@ class OrchestratorCore:
                 instruction = "Do nothing just say: No specialized sub-agents are currently available."
 
             # Update the existing workflow agent
+            self.workflow_agent.model= LiteLlm(model=LLM_MODEL) # type: ignore
             self.workflow_agent.instruction = instruction
-            self.workflow_agent.sub_agents = sub_agents
+            self.workflow_agent.sub_agents = cast(list[BaseAgent], sub_agents)
 
             logger.info(f"🤖 Updated workflow agent with {len(sub_agents)} sub-agents")
 

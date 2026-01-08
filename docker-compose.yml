@@ -32,6 +32,7 @@ services:
       - VISION_AGENT_ENDPOINT=${VISION_AGENT_ENDPOINT}
       - ARTIFACT_SERVICE_TYPE=${ARTIFACT_SERVICE_TYPE}
       - ARTIFACT_ROOT_DIR=${ARTIFACT_ROOT_DIR}
+      - LLM_MODEL=${LLM_MODEL:-openai/gpt-5.2}
     depends_on:
       - postgres
     networks:
