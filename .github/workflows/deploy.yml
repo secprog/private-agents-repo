@@ -35,7 +35,7 @@ jobs:
 
       - name: Build Services
         run: docker compose -f docker-compose.yml build --no-cache
-        timeout-minutes: 15
+        timeout-minutes: 30
       
       - name: Start Services
         run: docker compose -f docker-compose.yml up -d --force-recreate
