@@ -11,6 +11,9 @@ jobs:
     timeout-minutes: 15
     continue-on-error: true
     steps:
+      - name: Stop Running Services
+        run: docker compose -f docker-compose.yml down --remove-orphans || true
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -48,6 +51,9 @@ jobs:
     needs: deploy
     if: ${{ needs.deploy.conclusion == 'failure' || needs.deploy.conclusion == 'timed_out' }}
     steps:
+      - name: Stop Running Services
+        run: docker compose -f docker-compose.yml down --remove-orphans || true
+
       - name: Checkout code
         uses: actions/checkout@v4
 
