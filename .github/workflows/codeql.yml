@@ -58,10 +58,7 @@ jobs:
 
           # Register x86_64 ELF (e_machine = 0x3e) to /usr/local/bin/box64.
           # The magic/mask below is a known working pattern used for box64 binfmt configs. :contentReference[oaicite:3]{index=3}
-          sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null <<'EOF'
-:box64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/local/bin/box64:CF
-EOF
-
+          sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null <<'EOF' :box64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/local/bin/box64:CF EOF
           # Show what got registered
           cat /proc/sys/fs/binfmt_misc/box64 || true
 
