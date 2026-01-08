@@ -50,3 +50,23 @@ jobs:
         with:
           name: codeql-sarif
           path: codeql-results.sarif
+
+      - name: Setup Node (for SARIF -> HTML)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Convert SARIF to HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx -y sarif-explorer \
+            --input codeql-results.sarif \
+            --output codeql-results.html \
+            --no-snippets
+
+      - name: Upload HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-html
+          path: codeql-results.html
