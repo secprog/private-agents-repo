@@ -1,0 +1,29 @@
+jobs:
+  codeql:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run CodeQL in amd64 container
+        run: |
+          docker run --rm --platform=linux/amd64 \
+            -v "$PWD:/work" -w /work ubuntu:22.04 bash -lc '
+              apt update &&
+              apt install -y curl unzip python3 python3-pip &&
+              curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-bundle-linux64.tar.gz -o /tmp/codeql.tgz &&
+              mkdir /opt/codeql &&
+              tar -xzf /tmp/codeql.tgz -C /opt/codeql &&
+              export PATH=/opt/codeql/codeql:$PATH &&
+
+              if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi &&
+
+              codeql database create db --language=python --source-root . &&
+              codeql database analyze db codeql/python-queries \
+                --format=sarifv2.1.0 --output=codeql.sarif
+            '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codeql-sarif
+          path: codeql.sarif
