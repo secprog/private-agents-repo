@@ -19,7 +19,7 @@ from google.adk_community.memory import OpenMemoryService
 from google.adk.auth.credential_service.in_memory_credential_service import (
     InMemoryCredentialService,
 )
-from a2a.types import AgentCard
+from a2a.types import AgentCard, AgentSkill, AgentCapabilities, AgentExtension
 from a2aExtensions.A2AUploadMiddleware import A2AUploadMiddleware
 
 # Initialize logging
@@ -32,7 +32,7 @@ db_url = os.getenv("DATABASE_URL", "postgresql://admin:admin123@localhost:5432/a
 # Get OpenMemory configuration from environment variables
 # Use OM_BASE_URL (from docker-compose) with fallback to OPENMEMORY_BASE_URL for backward compatibility
 mem_url = os.getenv("OM_BASE_URL", "http://openmemory:8080")
-mem_api_key = os.getenv("OM_API_KEY")
+mem_api_key = os.getenv("OM_API_KEY", "")
 # Convert postgresql:// to postgresql+psycopg:// for async support
 if db_url.startswith("postgresql://") and "+psycopg" not in db_url:
     db_url = db_url.replace("postgresql://", "postgresql+psycopg://", 1)
@@ -52,23 +52,37 @@ orchestrator_app = App(
 # Generate dynamic skills from discovered sub-agents
 dynamic_skills = orchestrator_core.get_skills_from_sub_agents()
 
+# Ensure each dynamic skill is an AgentSkill instance (convert dicts if necessary)
+def _ensure_agent_skills(skills):
+    converted = []
+    for s in skills:
+        if isinstance(s, AgentSkill):
+            converted.append(s)
+        elif isinstance(s, dict):
+            converted.append(AgentSkill(**s))
+        else:
+            raise TypeError(f"Unsupported skill type: {type(s)}")
+    return converted
+
+agent_skills = _ensure_agent_skills(dynamic_skills)
+
 agent_card = AgentCard(
     name=orchestrator_core.agent_id,
     url="http://localhost:8000",
     description=orchestrator_core.workflow_agent.description,
     version="1.0.0",
-    capabilities={
-        "extensions": [
-            {
-                "uri": "urn:orquestrator:artifact-upload:v1",
-                "description": "File Upload chunked (start/append/finish).",
-                "required": False,
-                "params": {"maxChunkBytes": 1000000},  # 1MB
-            }
+    capabilities=AgentCapabilities(
+        extensions=[
+            AgentExtension(
+                uri="urn:orquestrator:artifact-upload:v1",
+                description="File Upload chunked (start/append/finish).",
+                required=False,
+                params={"maxChunkBytes": 1000000},  # 1MB
+            )
         ], 
-        "streaming": True,
-    },
-    skills=dynamic_skills,  # Use dynamically generated skills
+        streaming=True,
+    ),
+    skills=agent_skills,  # Use dynamically generated skills converted to AgentSkill
     default_input_modes=["text/plain"],
     default_output_modes=["text/plain"],
     supports_authenticated_extended_card=False,
