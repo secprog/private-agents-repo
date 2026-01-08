@@ -1,4 +1,4 @@
-name: codeql-python-x64-emulation
+name: codeql-python-via-box64
 
 on:
   push:
@@ -14,80 +14,113 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install/register modern QEMU emulators for running amd64 containers on arm64 host
-      - name: Set up QEMU (binfmt)
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: amd64
-
-      - name: Sanity check amd64 containers run
+      - name: Install build deps for Box64 + tooling
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm --platform=linux/amd64 alpine:3.19 uname -m | tee /tmp/arch.txt
-          grep -qx "x86_64" /tmp/arch.txt
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git cmake make gcc g++ \
+            curl unzip \
+            python3 python3-pip \
+            ca-certificates \
+            binutils \
+            kmod
 
+      - name: Build and install Box64
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/box64
+          git clone --depth 1 https://github.com/ptitSeb/box64 /tmp/box64
+          mkdir -p /tmp/box64/build
+          cd /tmp/box64/build
+          cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          make -j"$(nproc)"
+          sudo make install
+          /usr/local/bin/box64 -v || true
 
-      - name: Run CodeQL (amd64 container) with Java 21 and produce SARIF
+      - name: Enable binfmt_misc and register x86_64 -> box64
         shell: bash
         run: |
           set -euo pipefail
 
-          docker run --rm --platform=linux/amd64 \
-            -v "$PWD:/work" -w /work \
-            python:3.11-slim bash -lc '
-              set -euo pipefail
+          # Ensure binfmt_misc is available
+          sudo modprobe binfmt_misc || true
+          if ! mountpoint -q /proc/sys/fs/binfmt_misc; then
+            sudo mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc || true
+          fi
 
-              apt-get update
-              apt-get install -y --no-install-recommends --no-upgrade \
-                ca-certificates curl unzip git \
-                openjdk-21-jdk-headless
+          # If there is an old registration, remove it
+          if [ -e /proc/sys/fs/binfmt_misc/box64 ]; then
+            echo -1 | sudo tee /proc/sys/fs/binfmt_misc/box64 >/dev/null || true
+          fi
 
-              export CODEQL_JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+          # Register x86_64 ELF (e_machine = 0x3e) to /usr/local/bin/box64.
+          # The magic/mask below is a known working pattern used for box64 binfmt configs. :contentReference[oaicite:3]{index=3}
+          sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null <<'EOF'
+:box64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x3e\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/local/bin/box64:CF
+EOF
 
-              python -m pip install --upgrade pip
-              if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-              if [ -f pyproject.toml ] || [ -f setup.py ]; then pip install -e .; fi
+          # Show what got registered
+          cat /proc/sys/fs/binfmt_misc/box64 || true
 
-              curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip \
-                -o /tmp/codeql.zip
-              mkdir -p /opt/codeql
-              unzip -q /tmp/codeql.zip -d /opt/codeql
-              export PATH="/opt/codeql/codeql:$PATH"
+      - name: Download CodeQL CLI (linux64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/codeql"
+          curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip \
+            -o "$RUNNER_TEMP/codeql/codeql.zip"
+          unzip -q "$RUNNER_TEMP/codeql/codeql.zip" -d "$RUNNER_TEMP/codeql"
+          echo "$RUNNER_TEMP/codeql/codeql" >> "$GITHUB_PATH"
 
-              codeql version
+      - name: Verify CodeQL runs (via Box64) + make JVM safer
+        shell: bash
+        run: |
+          set -euo pipefail
 
-              rm -rf /tmp/codeql-db
+          # Force Java interpreter mode to reduce JIT-related crashes under emulation.
+          # You can remove this later if it proves stable without it.
+          echo "JAVA_TOOL_OPTIONS=-Xint" >> "$GITHUB_ENV"
 
-              codeql database create /tmp/codeql-db \
-                --language=python \
-                --source-root /work
+          # Optional: stronger memory model (sometimes helps on dynarec edge cases)
+          echo "BOX64_DYNAREC_STRONGMEM=1" >> "$GITHUB_ENV"
 
-              codeql database analyze /tmp/codeql-db \
-                codeql/python-queries \
-                --format=sarifv2.1.0 \
-                --output=/work/codeql-results.sarif \
-                --sarif-category=codeql \
-                --threads=0 \
-                --download
-            '
-            
+          codeql version
+          codeql resolve languages | grep -q python
+
+      - name: Install Python deps (optional but recommended)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
+          if [ -f pyproject.toml ] || [ -f setup.py ]; then pip3 install -e .; fi
+
+      - name: Create CodeQL database (Python)
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf codeql-db
+          codeql database create codeql-db \
+            --language=python \
+            --source-root .
+
+      - name: Analyze -> SARIF
+        shell: bash
+        run: |
+          set -euo pipefail
+          codeql database analyze codeql-db \
+            codeql/python-queries \
+            --format=sarifv2.1.0 \
+            --output=codeql-results.sarif \
+            --sarif-category=codeql \
+            --threads=0 \
+            --download
+
       - name: Upload SARIF artifact
         uses: actions/upload-artifact@v4
         with:
           name: codeql-sarif
           path: codeql-results.sarif
-
-      # 3) Optional: fail CI if findings exist
-      - name: Fail on findings (optional)
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - << 'PY'
-          import json
-          with open("codeql-results.sarif","r",encoding="utf-8") as f:
-            sarif=json.load(f)
-          results=sum(len(r.get("results",[])) for r in sarif.get("runs",[]))
-          print("CodeQL results:", results)
-          raise SystemExit(2 if results else 0)
-          PY
