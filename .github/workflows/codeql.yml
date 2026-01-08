@@ -13,20 +13,13 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Add preinstalled CodeQL to PATH
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "/home/particle/codeql" >> "$GITHUB_PATH"
-          codeql version
           
       - name: Create CodeQL database (Python)
         shell: bash
         run: |
           set -euo pipefail
           rm -rf codeql-db
-          codeql database create codeql-db \
+          /home/particle/codeql/codeql database create codeql-db \
             --language=python \
             --source-root .
 
@@ -34,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          codeql database analyze codeql-db \
+          /home/particle/codeql/codeql database analyze codeql-db \
             codeql/python-queries \
             --format=sarifv2.1.0 \
             --output=codeql-results.sarif \
