@@ -188,6 +188,7 @@ class AgentPlatform {
         this.displayedArtifactIds = new Set(); // Track artifact IDs that have been displayed to prevent duplicates
         this.processedTaskArtifacts = new Map(); // Track which tasks have had their artifacts processed (taskId -> Set of artifact content hashes)
         this.streamingEnabled = localStorage.getItem('streamingEnabled') !== 'false'; // Default to true
+        this.toastBehavior = localStorage.getItem('toastBehavior') || 'stack'; // Default to stack
 
         this.loadActiveTaskSubscriptionsFromStorage();
 
@@ -1308,9 +1309,46 @@ class AgentPlatform {
     // Cancel all running tasks
     async cancelAllRunningTasks() {
         try {
-            // This would need to be implemented based on your task tracking
-            // For now, we'll show a placeholder
-            this.showToast('Cancel all tasks functionality would be implemented here', 'info');
+            const activeTasks = Array.from(this.activeTaskSubscriptions.values());
+            
+            if (activeTasks.length === 0) {
+                this.showToast('No active tasks to cancel', 'info');
+                return;
+            }
+
+            // Confirm before cancelling all
+            if (!confirm(`Are you sure you want to cancel all ${activeTasks.length} running task(s)?`)) {
+                return;
+            }
+
+            this.showToast(`Cancelling ${activeTasks.length} task(s)...`, 'info');
+            
+            let cancelledCount = 0;
+            let failedCount = 0;
+
+            // Cancel each active task
+            for (const record of activeTasks) {
+                try {
+                    await this.cancelTask(record.taskId);
+                    
+                    // Remove from active subscriptions
+                    this.activeTaskSubscriptions.delete(record.taskId);
+                    cancelledCount++;
+                } catch (error) {
+                    console.error(`Failed to cancel task ${record.taskId}:`, error);
+                    failedCount++;
+                }
+            }
+
+            // Save updated subscriptions
+            this.saveActiveTaskSubscriptions();
+
+            // Show result
+            if (failedCount === 0) {
+                this.showToast(`Successfully cancelled ${cancelledCount} task(s)`, 'success');
+            } else {
+                this.showToast(`Cancelled ${cancelledCount} task(s), ${failedCount} failed`, 'warning');
+            }
         } catch (error) {
             console.error('Error canceling all tasks:', error);
             this.showToast('Failed to cancel all tasks', 'error');
@@ -4278,12 +4316,17 @@ class AgentPlatform {
         document.getElementById('settingsModal').style.display = 'flex';
 
         // Load current settings
-        document.getElementById('llmProvider').value = localStorage.getItem('llmProvider') || 'azure';
         document.getElementById('apiEndpoint').value = this.apiEndpoint;
 
         // Load retry configuration
         document.getElementById('retryAttempts').value = localStorage.getItem('retryAttempts') || '3';
         document.getElementById('retryInterval').value = localStorage.getItem('retryInterval') || '2';
+
+        // Load toast behavior
+        const toastBehaviorSelect = document.getElementById('toastBehavior');
+        if (toastBehaviorSelect) {
+            toastBehaviorSelect.value = localStorage.getItem('toastBehavior') || 'stack';
+        }
 
         // Load notification preferences - check actual permission status
         const notificationsEnabled = localStorage.getItem('notificationsEnabled') === 'true';
@@ -4300,10 +4343,8 @@ class AgentPlatform {
     }
 
     saveSettings() {
-        const provider = document.getElementById('llmProvider').value;
         const endpoint = document.getElementById('apiEndpoint').value;
 
-        localStorage.setItem('llmProvider', provider);
         localStorage.setItem('apiEndpoint', endpoint);
 
         // Save retry configuration
@@ -4312,6 +4353,14 @@ class AgentPlatform {
 
         localStorage.setItem('retryAttempts', retryAttempts);
         localStorage.setItem('retryInterval', retryInterval);
+
+        // Save toast behavior
+        const toastBehaviorSelect = document.getElementById('toastBehavior');
+        if (toastBehaviorSelect) {
+            const toastBehavior = toastBehaviorSelect.value;
+            localStorage.setItem('toastBehavior', toastBehavior);
+            this.toastBehavior = toastBehavior;
+        }
 
         // Save notification preferences
         const notificationsEnabled = document.getElementById('notificationsEnabled').checked;
@@ -4353,11 +4402,13 @@ class AgentPlatform {
         const streamingIcon = document.getElementById('streamingIcon');
         const streamingBtn = document.getElementById('streamingToggleBtn');
         if (streamingIcon) {
-            streamingIcon.className = this.streamingEnabled ? 'fas fa-bolt' : 'fas fa-bolt-slash';
+            streamingIcon.className = 'fas fa-rss';
             streamingIcon.style.color = this.streamingEnabled ? '#10b981' : '#ef4444'; // Green when enabled, red when disabled
+            streamingIcon.style.fontSize = '18px';
         }
         if (streamingBtn) {
             streamingBtn.title = `Streaming: ${this.streamingEnabled ? 'Enabled' : 'Disabled'}`;
+            streamingBtn.style.backgroundColor = 'transparent';
         }
     }
 
@@ -4428,21 +4479,53 @@ class AgentPlatform {
     }
 
     showToast(message, type = 'info') {
-        const toast = document.getElementById('taskToast');
-        const toastMessage = document.getElementById('toastMessage');
-        const icon = toast.querySelector('i');
-
-        // Update icon based on type
+        if (this.toastBehavior === 'replace') {
+            // Replace mode: clear existing toasts
+            const existingContainer = document.getElementById('toastContainer');
+            if (existingContainer) {
+                existingContainer.remove();
+            }
+        }
+        
+        // Create a new toast element
+        const toast = document.createElement('div');
+        toast.className = 'toast toast-' + type;
+        
+        const toastContent = document.createElement('div');
+        toastContent.className = 'toast-content';
+        
+        const icon = document.createElement('i');
         icon.className = type === 'success' ? 'fas fa-check-circle' :
             type === 'error' ? 'fas fa-exclamation-circle' :
                 type === 'warning' ? 'fas fa-exclamation-triangle' :
                     'fas fa-info-circle';
-
-        toastMessage.textContent = message;
-        toast.style.display = 'block';
-
+        
+        const messageSpan = document.createElement('span');
+        messageSpan.textContent = message;
+        
+        toastContent.appendChild(icon);
+        toastContent.appendChild(messageSpan);
+        toast.appendChild(toastContent);
+        
+        // Create or get toast container
+        let toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.id = 'toastContainer';
+            toastContainer.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column-reverse; gap: 10px;';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Add toast to container
+        toastContainer.appendChild(toast);
+        
+        // Trigger animation
+        setTimeout(() => toast.classList.add('show'), 10);
+        
+        // Remove toast after 3 seconds
         setTimeout(() => {
-            toast.style.display = 'none';
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
         }, 3000);
     }
 

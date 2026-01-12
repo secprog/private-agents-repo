@@ -106,9 +106,6 @@
                     </div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-icon" id="streamingToggleBtn" title="Streaming: Enabled">
-                        <i class="fas fa-bolt" id="streamingIcon"></i>
-                    </button>
                     <button class="btn-icon" id="themeToggleBtn" title="Toggle Theme">
                         <i class="fas fa-moon" id="themeIcon"></i>
                     </button>
@@ -185,6 +182,9 @@
                     <!-- Attachments will be shown here -->
                 </div>
                 <div class="input-wrapper">
+                    <button class="btn-attach" id="streamingToggleBtn" title="Streaming: Enabled">
+                        <i class="fas fa-rss" id="streamingIcon" style="font-size: 18px;"></i>
+                    </button>
                     <button class="btn-attach" id="attachBtn" title="Attach file">
                         <i class="fas fa-paperclip"></i>
                     </button>
@@ -227,13 +227,6 @@
             </div>
             <div class="modal-body">
                 <div class="settings-section">
-                    <h3>LLM Provider</h3>
-                    <select id="llmProvider" class="form-select">
-                        <option value="azure">Azure OpenAI</option>
-                        <option value="openai">OpenAI</option>
-                    </select>
-                </div>
-                <div class="settings-section">
                     <h3>API Endpoint</h3>
                     <input type="text" id="apiEndpoint" class="form-input" value="http://localhost:8000">
                 </div>
@@ -267,6 +260,18 @@
                             <input type="checkbox" id="taskFailedNotifications" checked>
                             Task Failed
                         </label>
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Toast Notifications</h3>
+                    <div class="form-group">
+                        <label for="toastBehavior">Toast Behavior</label>
+                        <select id="toastBehavior" class="form-select">
+                            <option value="stack">Stack - Show all toasts at once</option>
+                            <option value="replace">Replace - Show one toast at a time</option>
+                        </select>
+                        <small>Choose how multiple status updates are displayed</small>
                     </div>
                 </div>
                 
