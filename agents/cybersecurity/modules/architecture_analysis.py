@@ -8,11 +8,12 @@ import json
 
 from typing import Optional
 
-from google.adk_community.models.openai_llm import OpenAI
+from google.adk.models import LiteLlm
 from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 from .prompts import get_comprehensive_security_analysis_instructions
 from .models import ComprehensiveSecurityAnalysis
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ class ArchitectureAnalysis:
             logger.info(f"Analysis context built: {len(context)} characters")
             
             # Perform security analysis using LLM
-            llm = OpenAI(model="gpt-5.1")
+            llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5.1"))
             llm_request = LlmRequest(
                 model=llm.model,
                 contents=[

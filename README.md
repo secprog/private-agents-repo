@@ -7,20 +7,20 @@ A comprehensive multi-agent AI platform built with Google ADK SDK and A2A protoc
 ## 🌟 Features
 
 ### Core Capabilities
-- **Modular Architecture**: Clean separation of concerns with shared modules
-- **Multi-Agent System**: Orchestrator agent with specialized agents (CyberSecurity, DevOps, Data, ML)
-- **A2A Protocol**: Secure HTTPS-based agent-to-agent communication using Google ADK SDK
+- **Modular Architecture**: Clean separation of concerns with specialized agents
+- **Multi-Agent System**: Orchestrator agent with specialized agents (CyberSecurity, Vision, RAG)
+- **A2A Protocol**: HTTP-based agent-to-agent communication using Google ADK SDK
 - **Intelligent Routing**: Automatic task analysis and routing to appropriate agents
-- **Real-time Communication**: WebSocket support for live updates and notifications
-- **Memory & History**: Complete chat history with persistent storage
+- **Memory & History**: Complete chat history with persistent storage using PostgreSQL
 - **File Attachments**: Support for uploading and processing file attachments
 - **Modern UI**: Beautiful, responsive JavaScript frontend with dark/light themes
+- **LiteLLM Integration**: Unified LLM interface supporting OpenAI, Azure, Google, and more
 
 ### 🏗️ Modular Structure
-- **Shared Modules**: Common data models, A2A client, LLM integration, database utilities
-- **Custom LLM Integration**: Native OpenAI and Gemini support in `shared/models/`
+- **Google ADK SDK**: Built on Google Agent Development Kit for robust agent development
+- **LiteLLM**: Unified interface for all LLM providers (OpenAI, Azure, Google, etc.)
 - **Clean Separation**: Business logic separated from API handlers
-- **Reusable Components**: Shared modules eliminate code duplication
+- **Database Persistence**: PostgreSQL for sessions, Neo4j for RAG knowledge graphs
 - **Easy Testing**: Modules can be tested independently
 - **Scalable Design**: Easy to add new agents and capabilities
 
@@ -40,12 +40,19 @@ A comprehensive multi-agent AI platform built with Google ADK SDK and A2A protoc
 - Security recommendations
 - Pattern-based detection
 
-#### 🚀 DevOps Agent
-- Deployment configurations
-- CI/CD pipeline generation
-- Infrastructure as Code templates
-- Docker/Kubernetes configurations
-- Monitoring setup
+#### 👁️ Vision Agent
+- Image analysis and understanding
+- Document processing
+- Visual content extraction
+- OCR capabilities
+- Multi-modal processing
+
+#### 📚 RAG Agent
+- Document retrieval and search
+- Knowledge extraction
+- Vector and graph-based search
+- Entity detection and relationships
+- Hybrid search capabilities
 
 ## 📋 Prerequisites
 
@@ -87,21 +94,31 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # Install all requirements
-pip install -r agents/shared/requirements.txt
 pip install -r agents/orchestrator/requirements.txt
 pip install -r agents/cybersecurity/requirements.txt
-pip install -r agents/devops/requirements.txt
+pip install -r agents/vision/requirements.txt
+pip install -r agents/rag/requirements.txt
 ```
 
-### 3. Configure LLM Provider
+### 3. Configure Environment
 
-#### Google Gemini
+Copy `.env.example` to `.env` and configure your settings:
 ```bash
-# Set your Google AI API key
-export GOOGLE_API_KEY="your-google-ai-api-key-here"
+# LLM Configuration (LiteLLM supports OpenAI, Azure, Google, etc.)
+OPENAI_API_KEY=your-openai-api-key
+GOOGLE_API_KEY=your-google-api-key  # Optional, for Gemini models
+LLM_MODEL=openai/gpt-5.2-reasoning  # Or any LiteLLM-supported model
 
-# Or create a .env file
-echo "GOOGLE_API_KEY=your-google-ai-api-key-here" > .env
+# Database Configuration
+DATABASE_URL=postgresql://admin:admin123@postgres:5432/agent_platform
+NEO4J_URI=bolt://neo4j:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
+NEO4J_DATABASE=neo4j
+
+# OpenMemory Configuration
+OM_API_KEY=your-openmemory-api-key
+OM_BASE_URL=http://openmemory:8080
 ```
 
 ### 4. Start the Platform
@@ -123,18 +140,21 @@ python -m agents.orchestrator.orchestrator
 # Terminal 2 - CyberSecurity Agent
 python -m agents.cybersecurity.cybersecurity_agent
 
-# Terminal 3 - DevOps Agent
-python -m agents.devops.devops_agent
+# Terminal 3 - Vision Agent
+python -m agents.vision.vision_agent
 
-# Terminal 4 - Frontend
+# Terminal 4 - RAG Agent
+python -m agents.rag.rag_agent
+
+# Terminal 5 - Frontend
 cd frontend
 npm install
 npm start
 ```
 
-### 7. Access the Platform
-- **Frontend**: http://localhost:3000 (or https://localhost with nginx)
-- **Orchestrator API**: https://localhost:8000 (internal A2A communication)
+### 5. Access the Platform
+- **Frontend**: http://localhost:3000
+- **Orchestrator API**: http://localhost:8000 (A2A communication)
 - **Internal Agents**: Not exposed externally (secure internal networking)
 
 ## 🏗️ Architecture
@@ -144,16 +164,16 @@ npm start
 The platform implements a **secure, layered architecture** where:
 
 - **Frontend** communicates with **Orchestrator Agent** via A2A protocol
-- **Orchestrator Agent** routes tasks to **Internal Agents** via secure internal networking
+- **Orchestrator Agent** routes tasks to **Internal Agents** via Docker internal networking
 - **Internal Agents** are not exposed externally - only accessible through the orchestrator
 - **Docker internal networking** ensures secure agent-to-agent communication
 - **Only Frontend and Orchestrator** are exposed to external traffic
 
 ### 🛡️ Security Benefits
 
-- **Reduced Attack Surface**: Only 2 endpoints exposed instead of 4+
+- **Reduced Attack Surface**: Only 2 endpoints exposed instead of 5+
 - **Internal Agent Protection**: Specialized agents are completely isolated
-- **A2A Protocol Security**: All communication uses secure HTTPS with A2A protocol
+- **A2A Protocol**: Standardized JSON-RPC 2.0 based communication protocol
 - **Network Isolation**: Internal agents communicate via Docker internal network
 - **Centralized Control**: All external access goes through the orchestrator
 
@@ -162,30 +182,31 @@ The platform implements a **secure, layered architecture** where:
 │                     Frontend (JavaScript)                │
 │                   Beautiful Modern UI                    │
 └────────────────────────┬────────────────────────────────┘
-                         │ A2A Protocol (HTTPS)
+                         │ A2A Protocol (HTTP)
                          ▼
 ┌─────────────────────────────────────────────────────────┐
 │              Orchestrator Agent (Python)                 │
 │                    Route & Coordinate                    │
 │                  (Only Exposed Agent)                    │
-└──────────┬──────────────┬──────────────┬────────────────┘
-           │              │              │
-      A2A Protocol   A2A Protocol   A2A Protocol
-    (Internal Only) (Internal Only) (Internal Only)
-           │              │              │
-           ▼              ▼              ▼
-    ┌──────────┐   ┌──────────┐   ┌──────────┐
-    │  Cyber   │   │  DevOps  │   │   Data   │
-    │ Security │   │  Agent   │   │  Agent   │
-    │  Agent   │   │          │   │          │
-    │(Internal)│   │(Internal)│   │(Internal)│
-    └──────────┘   └──────────┘   └──────────┘
-           │              │              │
-           └──────────────┴──────────────┘
+└──────────┬────────────────┬──────────────┬──────────────┘
+           │                │              │
+      A2A Protocol      A2A Protocol  A2A Protocol
+    (Internal Only)   (Internal Only) (Internal Only)
+           │                │              │
+           ▼                ▼              ▼
+    ┌──────────┐     ┌──────────┐   ┌──────────┐
+    │  Cyber   │     │  Vision  │   │   RAG    │
+    │ Security │     │  Agent   │   │  Agent   │
+    │  Agent   │     │          │   │          │
+    │(Internal)│     │(Internal)│   │(Internal)│
+    └──────────┘     └──────────┘   └────┬─────┘
+           │                │              │
+           └────────────────┴──────────────┘
                          │
                     ┌────┴────┐
                     │         │
-                 File Storage  Cache
+               PostgreSQL    Neo4j
+              (Sessions)   (Knowledge Graph)
 ```
 
 ## 🛠️ Development
@@ -212,19 +233,18 @@ agent-platform/
 ### Project Structure
 ```
 agent-platform/
-├── shared/
-│   └── models/              # Custom LLM integrations
-│       ├── openai_llm.py    # Native OpenAI integration
-│       ├── registry.py      # LLM registration
-│       └── README.md        # LLM documentation
 ├── agents/
 │   ├── orchestrator/        # Main orchestrator agent
 │   ├── cybersecurity/       # Security analysis agent
-│   └── devops/             # DevOps automation agent
+│   ├── vision/             # Vision and image processing agent
+│   └── rag/                # RAG and document retrieval agent
+│       ├── rag_agent.py    # Main agent entry point
+│       ├── rag_analysis.py # RAG tools and search implementation
+│       └── models.py       # Pydantic data models
 ├── frontend/               # JavaScript frontend
-├── examples/               # Usage examples
-├── test_*.py              # Integration tests
-└── docker-compose.yml     # Container orchestration
+├── openmemory/            # OpenMemory cognitive engine
+├── docker-compose.yml     # Container orchestration
+└── .env                   # Environment configuration
 ```
 
 #### Managing Virtual Environment
@@ -249,21 +269,28 @@ deactivate
 ```bash
 cd agents/orchestrator
 pip install -r requirements.txt
-uvicorn orchestrator:app --host 0.0.0.0 --port 8000 --ssl-keyfile key.pem --ssl-certfile cert.pem
+python orchestrator.py
 ```
 
 #### CyberSecurity Agent
 ```bash
 cd agents/cybersecurity
 pip install -r requirements.txt
-uvicorn cybersecurity_agent:app --host 0.0.0.0 --port 8001 --ssl-keyfile key.pem --ssl-certfile cert.pem
+python cybersecurity_agent.py
 ```
 
-#### DevOps Agent
+#### Vision Agent
 ```bash
-cd agents/devops
+cd agents/vision
 pip install -r requirements.txt
-uvicorn devops_agent:app --host 0.0.0.0 --port 8002 --ssl-keyfile key.pem --ssl-certfile cert.pem
+python vision_agent.py
+```
+
+#### RAG Agent
+```bash
+cd agents/rag
+pip install -r requirements.txt
+python rag_agent.py
 ```
 
 #### Frontend
@@ -341,65 +368,63 @@ fetch('https://localhost:8000', {
 
 ## 🔧 Configuration
 
-### LLM Providers
-The platform supports multiple LLM providers with automatic detection:
+### LLM Configuration
 
-#### Google Gemini Models
-- **gemini-2.0-flash**: Latest Gemini model with advanced capabilities
-- **gemini-1.5-pro**: High-performance model
-- **gemini-1.5-flash**: Fast and efficient
+The platform uses **LiteLLM** for unified LLM access, supporting 100+ providers:
 
-### Model Selection
-The platform automatically selects the best available model based on your API key:
-- If `GOOGLE_API_KEY` is set → Uses Gemini models
+#### Supported Providers
+- **OpenAI**: GPT-5.2, GPT-5-mini, GPT-4, etc.
+- **Google**: Gemini models (gemini-2.0-flash, gemini-1.5-pro, etc.)
+- **Azure OpenAI**: Enterprise deployments
+- **Anthropic**: Claude models
+- **And many more**: See [LiteLLM documentation](https://docs.litellm.ai/docs/providers)
 
-### Google Gemini Setup
+#### Configuration
+Set the `LLM_MODEL` environment variable to any LiteLLM-supported model:
 
-#### 1. Get Google AI API Key
-1. Go to [Google AI Studio](https://aistudio.google.com)
-2. Sign in with your Google account
-3. Click "Get API Key"
-4. Create a new API key
-5. Copy the key
-
-#### 2. Configure Gemini
 ```bash
-# Set environment variable
-export GOOGLE_API_KEY="your-google-api-key-here"
+# OpenAI models
+LLM_MODEL=openai/gpt-5.2-reasoning
+LLM_MODEL=openai/gpt-5-mini
 
-# Or add to .env file
-echo "GOOGLE_API_KEY=your-google-api-key-here" >> .env
+# Google Gemini models
+LLM_MODEL=gemini/gemini-2.0-flash
+
+# Azure OpenAI
+LLM_MODEL=azure/gpt-4
 ```
 
-#### 3. Use Gemini in Your Code
+#### Usage in Code
 ```python
-from google.adk.agents import Agent
+from google.adk.models import LiteLlm
+import os
 
-# Simple usage - platform auto-detects Gemini
-agent = Agent(model="gemini-2.0-flash")
+# All agents use LiteLLM for model calls
+llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini"))
 
-# The platform automatically uses Gemini when GOOGLE_API_KEY is set
+# Embeddings also use LiteLLM
+import litellm
+response = litellm.embedding(
+    model="text-embedding-3-small",
+    input="Your text here"
+)
 ```
 
 ### File Handling
 
-#### OpenAI File Support
-- **Images**: PNG, JPEG, GIF, WebP (base64 encoded)
-- **PDFs**: Via Files API upload or base64 for vision models
-- **Documents**: Word docs via Files API or base64
-- **File References**: Converted to text descriptions
+The platform supports various file types through the artifact service:
 
-#### Gemini File Support
-- **Images**: PNG, JPEG, GIF, WebP (base64 encoded)
-- **PDFs**: Direct support with file references
+- **Images**: PNG, JPEG, GIF, WebP
+- **PDFs**: Document processing and text extraction
 - **Documents**: Word docs, text files
-- **File References**: Full URI support (GCS, HTTPS)
+- **Vision Processing**: Multi-modal analysis via Vision Agent
+- **File Storage**: Configurable artifact service (file or in-memory)
 
+### Database Configuration
 
-### SSL/TLS
-- Development uses self-signed certificates
-- Production should use proper certificates from a CA
-- All agent communication uses HTTPS with A2A protocol
+- **PostgreSQL**: Session management and persistence (with pgvector extension)
+- **Neo4j**: Knowledge graph for RAG agent (vector and graph search)
+- **OpenMemory**: Cognitive memory engine for long-term agent memory
 
 ## 📦 Docker Deployment
 
@@ -417,7 +442,8 @@ docker-compose up -d
 ```bash
 docker-compose logs -f orchestrator
 docker-compose logs -f cybersecurity-agent
-docker-compose logs -f devops-agent
+docker-compose logs -f vision-agent
+docker-compose logs -f rag-agent
 docker-compose logs -f frontend
 ```
 
@@ -456,10 +482,11 @@ docker-compose -f docker-compose.test.yml up --abort-on-container-exit
 ## 📊 Monitoring
 
 The platform includes basic health check endpoints:
-- Orchestrator: https://localhost:8000/
-- CyberSecurity: https://localhost:8001/
-- DevOps: https://localhost:8002/
-- Frontend: http://localhost:3000/health
+- Orchestrator: http://localhost:8000/
+- CyberSecurity: http://localhost:8001/ (internal only)
+- Vision: http://localhost:8002/ (internal only)
+- RAG: http://localhost:8003/ (internal only)
+- Frontend: http://localhost:3000/
 
 ## 🤝 Contributing
 
@@ -476,20 +503,22 @@ MIT License - See LICENSE file for details
 
 ### Common Issues
 
-#### WebSocket Connection Failed
-- Check if all services are running
-- Verify SSL certificates are generated
-- Check firewall settings
-
 #### Agent Not Responding
 - Check agent logs: `docker-compose logs agent-name`
 - Verify A2A protocol configuration
 - Check network connectivity between containers
+- Ensure DATABASE_URL is correctly configured
 
 #### LLM Connection Issues
-- Verify your API key is set correctly
+- Verify your API key is set correctly (OPENAI_API_KEY or GOOGLE_API_KEY)
 - Check if you have sufficient API credits
-- Ensure the model name is supported
+- Ensure the LLM_MODEL format matches LiteLLM syntax (e.g., `openai/gpt-5.2`)
+- Check LiteLLM documentation for provider-specific requirements
+
+#### Database Connection Issues
+- Ensure PostgreSQL is running: `docker-compose ps postgres`
+- Check Neo4j connection for RAG agent
+- Verify DATABASE_URL, NEO4J_URI in .env file
 
 ## 📚 Additional Resources
 

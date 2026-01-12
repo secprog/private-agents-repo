@@ -185,6 +185,9 @@ class AgentPlatform {
         this.activeTaskSubscriptions = new Map(); // taskId -> subscription metadata
         this.streamContexts = new Map(); // streamId -> context
         this.sessionArtifactRefs = new Map(); // sessionId -> [{ app, user, session, filename, mime }]
+        this.displayedArtifactIds = new Set(); // Track artifact IDs that have been displayed to prevent duplicates
+        this.processedTaskArtifacts = new Map(); // Track which tasks have had their artifacts processed (taskId -> Set of artifact content hashes)
+        this.streamingEnabled = localStorage.getItem('streamingEnabled') !== 'false'; // Default to true
 
         this.loadActiveTaskSubscriptionsFromStorage();
 
@@ -554,6 +557,13 @@ class AgentPlatform {
             deleteAllBtn.addEventListener('click', () => this.deleteAllSessions());
         }
 
+        // Streaming toggle button
+        const streamingToggleBtn = document.getElementById('streamingToggleBtn');
+        if (streamingToggleBtn) {
+            streamingToggleBtn.addEventListener('click', () => this.toggleStreaming());
+            this.updateStreamingIcon();
+        }
+
         // Theme toggle button
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         if (themeToggleBtn) {
@@ -785,7 +795,7 @@ class AgentPlatform {
         const controller = new AbortController();
         const headers = {
             'Content-Type': 'application/json',
-            'Accept': 'text/event-stream, application/json'
+            'Accept': this.streamingEnabled ? 'text/event-stream, application/json' : 'application/json'
         };
 
         try {
@@ -1029,6 +1039,10 @@ class AgentPlatform {
         }
 
         if (payload.result && payload.result.kind === 'status-update') {
+            return payload;
+        }
+
+        if (payload.result && payload.result.kind === 'artifact-update') {
             return payload;
         }
 
@@ -1668,6 +1682,12 @@ class AgentPlatform {
                 return;
             }
 
+            // Handle artifact-update events (streaming artifact content)
+            if (result.kind === "artifact-update") {
+                this.handleArtifactUpdate(result, capturedSessionId);
+                return;
+            }
+
             if (result.kind === "task" && result.status) {
                 const task = result;
                 const taskId = task.id;
@@ -1689,29 +1709,76 @@ class AgentPlatform {
                     this.saveMessageToSession(null, taskId, capturedSessionId);
                 }
 
+                // Check if we have artifacts to avoid duplicate messages
+                console.log('🔍 Checking for artifacts. result.artifacts:', result.artifacts);
+                const hasArtifacts = result.artifacts && Array.isArray(result.artifacts) && result.artifacts.length > 0;
+                console.log('🔍 hasArtifacts:', hasArtifacts, 'count:', hasArtifacts ? result.artifacts.length : 0);
+
                 // Handle different task states
                 if (taskStatus.state === "completed") {
-                    this.handleTaskComplete(task, capturedSessionId);
+                    console.log('📋 Task state: completed, hasArtifacts:', hasArtifacts);
+                    // Only call handler if no artifacts (to avoid duplicate messages)
+                    if (!hasArtifacts) {
+                        console.log('⚠️ Calling handleTaskComplete (no artifacts)');
+                        this.handleTaskComplete(task, capturedSessionId);
+                    } else {
+                        console.log('✅ Skipping handleTaskComplete (has artifacts)');
+                    }
                     this.updateTypingIndicatorForSession(capturedSessionId, false);
                 } else if (taskStatus.state === "failed") {
                     this.handleTaskFailed(task, capturedSessionId);
                     this.updateTypingIndicatorForSession(capturedSessionId, false);
                 } else if (taskStatus.state === "running") {
-                    this.handleTaskRunning(task, capturedSessionId);
+                    // Only call handler if no artifacts (to avoid duplicate messages)
+                    if (!hasArtifacts) {
+                        this.handleTaskRunning(task, capturedSessionId);
+                    }
                     this.updateTypingIndicatorForSession(capturedSessionId, true);
                 } else if (taskStatus.state === "waiting") {
-                    this.handleTaskWaiting(task, capturedSessionId);
+                    // Only call handler if no artifacts (to avoid duplicate messages)
+                    if (!hasArtifacts) {
+                        this.handleTaskWaiting(task, capturedSessionId);
+                    }
                     this.updateTypingIndicatorForSession(capturedSessionId, true);
                 } else if (taskStatus.state === "input-required") {
                     this.handleTaskInputRequired(task, capturedSessionId);
                 }
 
                 // Handle artifacts (the actual response content)
-                if (result.artifacts && Array.isArray(result.artifacts)) {
+                if (hasArtifacts) {
+                    console.log(`Processing ${result.artifacts.length} artifacts for task ${taskId}`);
+                    // Get or create the set of processed artifacts for this task
+                    if (!this.processedTaskArtifacts.has(taskId)) {
+                        this.processedTaskArtifacts.set(taskId, new Set());
+                        console.log(`Created new artifact tracking set for task ${taskId}`);
+                    }
+                    const processedArtifacts = this.processedTaskArtifacts.get(taskId);
+                    console.log(`Current processed artifacts count for task ${taskId}:`, processedArtifacts.size);
+                    
                     result.artifacts.forEach(artifact => {
+                        console.log('Processing artifact:', artifact.artifactId);
+                        // Skip if this artifact has already been displayed (by artifactId)
+                        if (artifact.artifactId && this.displayedArtifactIds.has(artifact.artifactId)) {
+                            console.log('Skipping artifact with ID already displayed:', artifact.artifactId);
+                            return;
+                        }
+                        
+                        // For artifacts without IDs, use content-based deduplication
                         if (artifact.parts && Array.isArray(artifact.parts)) {
                             artifact.parts.forEach(part => {
                                 if (part.kind === "text" && part.text) {
+                                    // Create a hash of the FULL content to detect duplicates (not just first 100 chars)
+                                    const contentHash = `${taskId}:text:${part.text}`;
+                                    console.log(`Checking content hash (first 50 chars): ${contentHash.substring(0, 50)}...`);
+                                    
+                                    // Skip if we've already processed this exact content for this task
+                                    if (processedArtifacts.has(contentHash)) {
+                                        console.log('✅ Skipping duplicate artifact content for task', taskId);
+                                        return;
+                                    }
+                                    console.log('➕ Adding new content hash to processed set');
+                                    processedArtifacts.add(contentHash);
+                                    
                                     this.addMessageToChat({
                                         id: artifact.artifactId || this.generateMessageId(),
                                         type: 'agent',
@@ -1764,6 +1831,7 @@ class AgentPlatform {
 
             } else if (result.history && Array.isArray(result.history)) {
                 // Handle history-based response (fallback)
+                console.log('📜 Using history-based response fallback, history length:', result.history.length);
                 const latestMessage = result.history[result.history.length - 1];
                 if (capturedSessionId) {
                     this.updateTypingIndicatorForSession(capturedSessionId, false);
@@ -2261,9 +2329,20 @@ class AgentPlatform {
         // Use displayState for toast type to match the displayed UI state (e.g., 'working' instead of 'input-required' for long-running tools)
         this.showToast(heading || 'Status update received.', this.getToastTypeForState(displayState));
         
+        // Don't add messages from status-update if there's a taskId
+        // Those messages will be delivered via artifact-update events to avoid duplicates
+        const shouldSkipMessageFromStatus = statusUpdate.taskId && hasSubstantiveContent;
+        console.log('🚫 Status-update message check:', {
+            taskId: statusUpdate.taskId,
+            hasSubstantiveContent,
+            shouldSkip: shouldSkipMessageFromStatus,
+            messagePreview: messageContent.substring(0, 50)
+        });
+        
         // Only render card if there's actual content beyond the status heading
         // Show card if there's substantive content OR attachments (not requiring both)
-        if (hasSubstantiveContent || attachments.length > 0) {
+        // BUT: Skip if this is a task with substantive content (will come via artifact-update)
+        if ((hasSubstantiveContent || attachments.length > 0) && !shouldSkipMessageFromStatus) {
             this.addMessageToChat({
                 id: displayStatusPayload.message?.messageId || this.generateMessageId(),
                 type: 'agent',
@@ -2285,6 +2364,61 @@ class AgentPlatform {
 
         if (statusUpdate.taskId && normalizedState && normalizedState !== 'input-required') {
             this.resolveInputRequest(statusUpdate.taskId);
+        }
+    }
+
+    // Handle artifact-update events from A2A streaming
+    handleArtifactUpdate(artifactUpdate, sessionId = null) {
+        if (!artifactUpdate || !artifactUpdate.artifact) {
+            console.warn('Artifact update missing artifact object:', artifactUpdate);
+            return;
+        }
+
+        const artifact = artifactUpdate.artifact;
+        const taskId = artifactUpdate.taskId;
+        const targetSessionId = sessionId || artifactUpdate.contextId || this.sessionId;
+
+        // Extract text content from artifact parts
+        let textContent = '';
+        if (artifact.parts && Array.isArray(artifact.parts)) {
+            artifact.parts.forEach(part => {
+                if (part.kind === 'text' && part.text) {
+                    textContent += part.text;
+                }
+            });
+        }
+
+        // Only add message if there's actual text content and this is the last chunk
+        if (textContent && artifactUpdate.lastChunk) {
+            // Deduplicate based on content hash
+            if (!this.processedTaskArtifacts.has(taskId)) {
+                this.processedTaskArtifacts.set(taskId, new Set());
+            }
+            const processedArtifacts = this.processedTaskArtifacts.get(taskId);
+            const contentHash = `${taskId}:artifact:${textContent}`;
+            
+            console.log('🎨 Artifact-update:', {
+                taskId,
+                artifactId: artifact.artifactId,
+                contentPreview: textContent.substring(0, 50),
+                alreadyProcessed: processedArtifacts.has(contentHash)
+            });
+            
+            if (processedArtifacts.has(contentHash)) {
+                console.log('⏭️  Skipping duplicate artifact content');
+                return;
+            }
+            
+            processedArtifacts.add(contentHash);
+            
+            this.addMessageToChat({
+                id: artifact.artifactId || this.generateMessageId(),
+                type: 'agent',
+                content: textContent,
+                timestamp: new Date().toISOString(),
+                agent: this.currentAgentName,
+                taskId: taskId
+            }, true, targetSessionId);
         }
     }
 
@@ -2589,6 +2723,13 @@ class AgentPlatform {
 
 
     addMessageToChat(message, saveToSession = true, sessionId = null) {
+        console.log('💬 addMessageToChat called:', {
+            type: message.type,
+            contentPreview: message.content?.substring(0, 50),
+            taskId: message.taskId,
+            saveToSession,
+            sessionId
+        });
         const messagesContainer = document.getElementById('chatMessages');
 
         // Hide welcome message when first message is added
@@ -3578,6 +3719,10 @@ class AgentPlatform {
 
         // Clear tool call messages map to prevent stale references
         this.toolCallMessages.clear();
+        
+        // Clear processed artifacts tracking for fresh start
+        this.processedTaskArtifacts.clear();
+        this.displayedArtifactIds.clear();
         this.toolCallStatusById.clear();
 
         // Hide typing indicator from previous session (new chat means no processing for this session)
@@ -4192,6 +4337,28 @@ class AgentPlatform {
     changeTheme(theme) {
         localStorage.setItem('theme', theme);
         this.applyTheme();
+    }
+
+    toggleStreaming() {
+        this.streamingEnabled = !this.streamingEnabled;
+        localStorage.setItem('streamingEnabled', this.streamingEnabled);
+        this.updateStreamingIcon();
+        this.showToast(
+            `Streaming ${this.streamingEnabled ? 'enabled' : 'disabled'}`,
+            'info'
+        );
+    }
+
+    updateStreamingIcon() {
+        const streamingIcon = document.getElementById('streamingIcon');
+        const streamingBtn = document.getElementById('streamingToggleBtn');
+        if (streamingIcon) {
+            streamingIcon.className = this.streamingEnabled ? 'fas fa-bolt' : 'fas fa-bolt-slash';
+            streamingIcon.style.color = this.streamingEnabled ? '#10b981' : '#ef4444'; // Green when enabled, red when disabled
+        }
+        if (streamingBtn) {
+            streamingBtn.title = `Streaming: ${this.streamingEnabled ? 'Enabled' : 'Disabled'}`;
+        }
     }
 
     toggleTheme() {

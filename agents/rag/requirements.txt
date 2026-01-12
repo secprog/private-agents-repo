@@ -1,5 +1,6 @@
 # Google ADK SDK and A2A Protocol
-google-adk @ git+https://github.com/google/adk-python@main
+google-adk @ git+https://github.com/secprog/adk-python@main
+google-adk-community @ git+https://github.com/secprog/adk-python-community@main
 a2a-sdk[all]>=0.3.11
 
 # Shared modules (installed separately)
@@ -8,8 +9,7 @@ a2a-sdk[all]>=0.3.11
 fastapi>=0.110.0
 uvicorn[standard]>=0.25.0
 
-# Azure OpenAI / OpenAI
-openai>=1.40.0
+litellm>=1.80.12
 
 # Security Analysis Tools
 bandit>=1.7.5
@@ -19,6 +19,7 @@ pyyaml>=6.0.1
 # Database
 psycopg[binary]>=3.1.0
 sqlalchemy>=2.0.0
+neo4j>=5.0.0
 
 # Utilities
 python-dotenv>=1.0.0

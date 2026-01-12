@@ -1,96 +1,111 @@
 <!-- Copilot instructions for contributors and AI assistants -->
 # Agent Platform — Copilot Instructions
 
-This file contains concise, actionable guidance for AI coding agents working in the `agent-platform` repository.
+**Purpose:** Multi-agent AI platform (built on Google ADK) where a central Orchestrator routes analysis tasks to specialized agents (Vision, CyberSecurity, RAG) via A2A protocol for architecture diagram analysis and threat assessment.
 
-- Big picture:
-  - **Purpose:** a multi-agent AI platform with a central `Orchestrator` that routes tasks to specialized agents (CyberSecurity, DevOps, Vision, RAG, etc.). Designed for secure A2A (agent-to-agent) communication and modular agent development.
-  - **Where to look:** primary code lives under `agents/` (e.g. `agents/orchestrator`, `agents/cybersecurity`, `agents/devops`, `agents/vision`) and the frontend under `frontend/`.
+## Big Picture Architecture
 
-- Architecture & boundaries:
-  - `Orchestrator` (only externally exposed agent) receives A2A messages and routes tasks to internal agents via HTTPS A2A protocol. See `agents/orchestrator/orchestrator.py`.
-  - Internal agents implement domain logic and are intended to be reachable only from the orchestrator (Docker internal network when using `docker-compose`). Examples: `agents/cybersecurity/cybersecurity_agent.py`, `agents/vision/vision_agent.py`.
-  - Shared libraries / models are placed in `agents/shared/` (LLM wrappers, A2A client, models). Reuse these to avoid duplication.
+**External Interface → Internal Agents Flow:**
+- Frontend (`frontend/app.js`) sends JSON-RPC A2A messages to Orchestrator (port 8000, externally exposed)
+- Orchestrator discovers and delegates to specialized agents over Docker internal network:
+  - Vision Agent (port 8002): analyzes images, extracts components/connections
+  - CyberSecurity Agent (port 8001): performs threat analysis using vision output
+  - RAG Agent (port 8003): vector/graph search for knowledge retrieval
+- All agents built with `google.adk.agents.Agent` + `google.adk.models.LiteLlm`
 
-- Developer workflows & common commands:
-  - Quick start (Docker Compose): build and run everything:
-    ```powershell
-    docker-compose up -d
-    docker-compose logs -f orchestrator
-    ```
-  - Local development (shared venv): repository includes `activate.bat`, `activate.sh`, and `setup_simple_venv.py` for a shared virtualenv. Typical flow:
-    ```powershell
-    # Windows (powershell)
-    python setup_simple_venv.py
-    .\venv\Scripts\Activate.ps1    # or run activate.bat
-    cd agents/orchestrator
-    pip install -r requirements.txt
-    python -m agents.orchestrator.orchestrator
-    ```
-  - Frontend: `cd frontend && npm install && npm start` (serves on http://localhost:3000 by default).
+**Key Pattern:** Each agent has a root agent + sub-agents (e.g., vision_agent.py defines root_agent with visual_analyzer sub-agent). See `agents/orchestrator/modules/orchestrator_core.py` for discovery logic.
 
-- Project-specific conventions and patterns:
-  - A2A message format: messages are JSON objects with `id`, `sender_id`, `recipient_id`, `message_type`, `content`, `metadata`, and `timestamp`. See examples in `README.md`.
-  - Security model: only `orchestrator` is exposed externally; other agents are internal. Assume TLS in examples and docker-compose during development uses self-signed certs.
-  - Shared virtualenv: repository intentionally uses a single `venv/` at repo root for all agents—avoid splitting environments unless necessary.
-  - File uploads / attachments: frontend sends attachments embedded in A2A messages; agents should expect base64-encoded blobs or file references.
+## Developer Workflows
 
-- Integration points & external dependencies:
-  - LLM providers: environment-driven; support for OpenAI / Azure / Gemini via env vars (see top-level README). Typical env vars: `OPENAI_API_KEY`, `AZURE_OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENAI_BASE_URL`, `AZURE_OPENAI_ENDPOINT`.
-  - Docker Compose: `docker-compose.yml` orchestrates containers and internal networking — use it for integration testing.
-  - SSL/TLS: development uses self-signed certs; production must use CA-signed certs. Uvicorn commands in README show `--ssl-keyfile` / `--ssl-certfile` for testing.
+**Docker Compose (recommended for integration testing):**
+```powershell
+docker-compose up -d          # Start all containers
+docker-compose logs -f orchestrator   # Watch startup
+```
 
-- Tests, debugging & common pitfalls:
-  - Unit tests are primarily in each agent's folder or top-level `test_*.py` integration tests referenced from `README.md`. Use `pytest -q` when inside the venv.
-  - If agents fail to discover each other, check Docker network and the orchestrator's registry endpoints; use `docker-compose logs` to inspect startup logs.
-  - For LLM integration failures, verify the corresponding env var and API key, and check rate limits or credentials.
+**Local dev (shared venv at repo root):**
+```powershell
+# Windows: activate.bat or .\venv\Scripts\Activate.ps1
+# Run agents in separate terminals
+python -m agents.orchestrator.orchestrator   # Port 8000
+python agents/vision/vision_agent.py          # Port 8002
+python agents/cybersecurity/cybersecurity_agent.py  # Port 8001
+```
 
-- Files to consult when making changes:
-  - `agents/orchestrator/orchestrator.py` — A2A routing, agent registry, and HTTP endpoints.
-  - `agents/*/*_agent.py` — Concrete agent implementations and FastAPI/Uvicorn servers.
-  - `frontend/` — JS client showing how A2A messages are constructed and sent.
-  - `docker-compose.yml` and `start.cmd` — Docker-based workflows and Windows entrypoints.
+**Frontend:**
+```powershell
+cd frontend && npm install && npm start  # http://localhost:3000
+```
 
-- PR guidance for reviewers:
-  - Provide a short design note explaining where changes live (which agent, shared module), and how routing or A2A semantics are preserved.
-  - Include environment variables required to run the change locally and any certificate instructions.
-  - Add focused tests for message schema, agent discovery, and state serialization when changing core A2A behavior.
+## Critical Conventions & Patterns
 
-If you want me to expand any section (example A2A messages, cert instructions, or a short contributor checklist), say which part and I will add more detail.
- 
--- Examples & Quick Snippets:
-- A2A message example (common shape used across projects):
-  ```json
-  {
-    "id": "msg_123",
-    "sender_id": "agent_or_frontend",
-    "recipient_id": "orchestrator",
-    "message_type": "chat_request",
-    "content": {
-      "session_id": "session_789",
-      "user_id": "user_456",
-      "content": "Analyze this code for security vulnerabilities",
-      "attachments": []
-    },
-    "metadata": { "timestamp": "2025-11-30T00:00:00Z", "source": "frontend" }
-  }
-  ```
+**1. LiteLLM Usage (non-negotiable):**
+- ✅ Always: `from google.adk.models import LiteLlm` + `llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini"))`
+- ✅ Embeddings: `litellm.embedding(model="text-embedding-3-small", input="text")`
+- ❌ Never: `from openai import OpenAI`, `from anthropic import Anthropic`, direct SDK imports
 
-- How to run tests locally (agent-platform):
-  ```powershell
-  # create + activate shared venv (repo root)
-  python setup_simple_venv.py
-  .\venv\Scripts\Activate.ps1
+**2. Agent Discovery & Routing:**
+- Orchestrator discovers agents via environment variables (e.g., `VISION_AGENT_ENDPOINT=http://vision-agent:8002`)
+- Agent discovery happens in `OrchestratorCore.__init__()` with retry logic (max 5 attempts, 5s delays)
+- Sub-agents are added via `workflow_agent.sub_agents = [discovered_agents]` after discovery
+- Tools attached to agents are callable via LLM instructions (see cybersecurity_agent.py line 40)
 
-  # Run unit tests (inside venv)
-  pytest -q
+**3. Database & Async Patterns:**
+- PostgreSQL async URL must be `postgresql+psycopg://` (not plain `postgresql://`)
+- DatabaseSessionService handles session persistence (imported from `google.adk.sessions`)
+- Artifact service defaults to file-based (`FileArtifactService(root_dir=./my_artifacts)`)
 
-  # Integration tests (docker-compose based)
-  docker-compose -f docker-compose.test.yml up --abort-on-container-exit
-  ```
+**4. A2A File Upload (custom extension in orchestrator):**
+- Frontend chunks files (1MB max) and calls `artifactUpload/{start|append|finish}` methods
+- See `agents/orchestrator/a2aExtensions/A2AUploadMiddleware.py` for implementation
+- Uploads scoped to session or user; memory cleanup on timeout
 
-- CI / Local checklist (quick):
-  - Required env vars for local testing: `OPENAI_API_KEY` or `AZURE_OPENAI_API_KEY`, `GOOGLE_API_KEY` (if using Gemini), `REDIS_URL` or local Redis running, `OPEN_MEMORY_API_KEY` (if testing OpenMemory integrations).
-  - SSL certs: development uses self-signed certs; place `key.pem` / `cert.pem` in repository root or point Uvicorn `--ssl-keyfile`/`--ssl-certfile` to your dev certs.
-  - Use `docker-compose logs -f orchestrator` to inspect orchestrator startup and agent registration.
+**5. Data Flow Pattern:**
+- Vision agent outputs structured JSON (components, connections, zones, inferred tech)
+- CyberSecurity agent receives this JSON and calls `architecture_analysis.analyze_architecture_security(data)`
+- Sub-agents inherit parent agent's tools; delegate via `planner=plan_re_act_planner.PlanReActPlanner()`
+
+## Integration Points
+
+**Environment Variables (required for local testing):**
+```
+# LLM
+OPENAI_API_KEY=sk-... or GOOGLE_API_KEY=AIza...
+LLM_MODEL=openai/gpt-5.2-reasoning  # Orchestrator uses this
+EMBEDDING_MODEL=text-embedding-3-small
+
+# Database
+DATABASE_URL=postgresql+psycopg://admin:admin123@localhost:5432/agent_platform
+NEO4J_URI=bolt://neo4j:7687 (RAG only)
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
+
+# Memory
+OM_BASE_URL=http://openmemory:8080
+OM_API_KEY=...
+
+# Artifacts
+ARTIFACT_ROOT_DIR=/artifacts
+```
+
+**Agent Endpoints (set in environment for discovery):**
+- `VISION_AGENT_ENDPOINT=http://vision-agent:8002`
+- `CYBERSECURITY_AGENT_ENDPOINT=http://cybersecurity-agent:8001`
+- `RAG_AGENT_ENDPOINT=http://rag-agent:8003`
+
+## Common Pitfalls & Debugging
+
+- **Agents don't connect:** Check Docker network and endpoint env vars. Verify with `docker-compose logs -f orchestrator`.
+- **LLM errors:** Verify `LLM_MODEL` format matches LiteLLM syntax (e.g., `openai/gpt-5.2-reasoning`), API keys set, rate limits.
+- **Database URL conversion:** Always convert `postgresql://` to `postgresql+psycopg://` for async support (see orchestrator.py line 32).
+- **Tool not called:** Ensure tool is in agent's `tools=[]` list and instruction explicitly references it.
+
+## Key Files Reference
+
+- `agents/orchestrator/orchestrator.py` — A2A routing setup, session/artifact services, agent discovery
+- `agents/orchestrator/modules/orchestrator_core.py` — Agent registry with retry logic, sub-agent assignment
+- `agents/*_agent.py` — Root agent definition with `Agent()` + ADK-specific instructions and tools
+- `agents/*/modules/*.py` — Analysis logic (e.g., `vision_analysis.py`, `architecture_analysis.py`)
+- `frontend/app.js` — A2A message construction, JSON-RPC calls, file chunking (A2AUploadService)
+- `docker-compose.yml` — Container networking, environment variable injection, port mappings
 
