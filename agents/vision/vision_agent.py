@@ -5,6 +5,7 @@ Vision Agent - Main entry point using ADK SDK
 import os
 import logging
 import warnings
+from google.adk.models import LiteLlm
 
 # Suppress Pydantic serialization warnings from LiteLLM internal responses
 warnings.filterwarnings("ignore", message=".*Pydantic serializer warnings.*")
@@ -18,8 +19,7 @@ from google.adk.apps.app import App, ResumabilityConfig
 import uvicorn
 from google.adk.planners import plan_re_act_planner
 from fastapi.middleware.cors import CORSMiddleware
-from google.adk.tools.long_running_tool import LongRunningFunctionTool
-from google.adk_community.models.openai_llm import OpenAI
+from google.adk.tools.function_tool import FunctionTool
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.adk.artifacts import FileArtifactService
@@ -50,7 +50,7 @@ vision_analysis = VisionAnalysis(artifact_service)
 visual_analysis_agent = Agent(
     name="visual_analyzer",
     description="Specialized agent for analyzing visual elements from images with advanced capabilities",
-    model=OpenAI(model="gpt-5.1"),
+    model=LiteLlm(model="openai/gpt-5.1"),
     instruction="""You are an advanced visual analysis agent specialized in analyzing diagrams and images.
 
 You have multiple tools available for comprehensive analysis:
@@ -112,39 +112,37 @@ CRITICAL PRE-CONDITION:
 - Instead, politely ask the user to provide an image or file to analyze.
 """,
     tools=[
-        # Core analysis bundle
-        LongRunningFunctionTool(func=vision_analysis.run_core_analysis_parallel),
+        # Core analysis bundle - using FunctionTool instead of LongRunningFunctionTool
+        # to workaround A2A task completion issue
+        FunctionTool(func=vision_analysis.run_core_analysis_parallel),
         # OCR & Text
-        LongRunningFunctionTool(func=vision_analysis.extract_text_from_image),
-        LongRunningFunctionTool(func=vision_analysis.extract_text_with_paddleocr),
-        LongRunningFunctionTool(func=vision_analysis.extract_text_with_consensus),
+        FunctionTool(func=vision_analysis.extract_text_from_image),
+        FunctionTool(func=vision_analysis.extract_text_with_paddleocr),
+        FunctionTool(func=vision_analysis.extract_text_with_consensus),
         # Enhancement bundle
-        LongRunningFunctionTool(func=vision_analysis.run_enhancement_analysis_parallel),
+        FunctionTool(func=vision_analysis.run_enhancement_analysis_parallel),
         # Enhancement
-        LongRunningFunctionTool(func=vision_analysis.detect_technologies),
-        LongRunningFunctionTool(func=vision_analysis.classify_diagram_type),
-        LongRunningFunctionTool(func=vision_analysis.extract_annotations),
+        FunctionTool(func=vision_analysis.detect_technologies),
+        FunctionTool(func=vision_analysis.classify_diagram_type),
+        FunctionTool(func=vision_analysis.extract_annotations),
         # Analysis
-        LongRunningFunctionTool(func=vision_analysis.analyze_layout),
-        LongRunningFunctionTool(func=vision_analysis.analyze_styling),
-        LongRunningFunctionTool(func=vision_analysis.infer_relationships),
+        FunctionTool(func=vision_analysis.analyze_layout),
+        FunctionTool(func=vision_analysis.analyze_styling),
+        FunctionTool(func=vision_analysis.infer_relationships),
         # Quality
-        LongRunningFunctionTool(func=vision_analysis.validate_visual_analysis),
-        LongRunningFunctionTool(func=vision_analysis.enhance_analysis),
-        LongRunningFunctionTool(func=vision_analysis.assess_image_quality),
-        # Advanced
-        #LongRunningFunctionTool(func=vision_analysis.identify_regions),
-        #LongRunningFunctionTool(func=vision_analysis.analyze_by_regions),
+        FunctionTool(func=vision_analysis.validate_visual_analysis),
+        FunctionTool(func=vision_analysis.enhance_analysis),
+        FunctionTool(func=vision_analysis.assess_image_quality),
         # Export
-        LongRunningFunctionTool(func=vision_analysis.export_to_plantuml),
-        LongRunningFunctionTool(func=vision_analysis.export_to_mermaid),
-        LongRunningFunctionTool(func=vision_analysis.export_to_drawio),
+        FunctionTool(func=vision_analysis.export_to_plantuml),
+        FunctionTool(func=vision_analysis.export_to_mermaid),
+        FunctionTool(func=vision_analysis.export_to_drawio),
         # Advanced Vision
-        LongRunningFunctionTool(func=vision_analysis.extract_legend_mappings),
-        LongRunningFunctionTool(func=vision_analysis.detect_line_crossings),
-        LongRunningFunctionTool(func=vision_analysis.detect_trust_boundaries),
+        FunctionTool(func=vision_analysis.extract_legend_mappings),
+        FunctionTool(func=vision_analysis.detect_line_crossings),
+        FunctionTool(func=vision_analysis.detect_trust_boundaries),
         # Comparison
-        LongRunningFunctionTool(func=vision_analysis.compare_diagrams),
+        FunctionTool(func=vision_analysis.compare_diagrams),
     ],
     planner=plan_re_act_planner.PlanReActPlanner(),
 )
@@ -152,7 +150,7 @@ CRITICAL PRE-CONDITION:
 merger = Agent(
     name="merge_visual_analysis",
     description="Specialized sub-agent for merging visual analysis results into unified representation",
-    model=OpenAI(model="gpt-5.1"),
+    model=LiteLlm(model="openai/gpt-5.1"),
     instruction=get_merger_instructions(),
 )
 
@@ -160,7 +158,7 @@ merger = Agent(
 root_agent = Agent(
     name=agent_identifier,
     description="Specialized agent for visual analysis of diagrams and images.",
-    model=OpenAI(model="gpt-5.1"),
+    model=LiteLlm(model="openai/gpt-5.1"),
     instruction="""For visual analysis tasks, you have two sub-agents:
 1. visual_analyzer - Performs visual analysis using tools (and uses run_core_analysis_parallel to fetch components/connections/zones together)
 2. merge_visual_analysis - Merges visual analysis results into unified representation

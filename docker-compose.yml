@@ -115,8 +115,6 @@ services:
     build:
       context: ./openmemory/packages/openmemory-js
       dockerfile: Dockerfile
-    # Note: Run setup-openmemory script first to clone CaviraOSS OpenMemory backend
-    # The backend files will be copied directly to ./openmemory/ after setup
     container_name: ${OPENMEMORY_CONTAINER:-openmemory}
     restart: always
     ports:
