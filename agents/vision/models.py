@@ -4,6 +4,8 @@ from pydantic import BaseModel, Field, confloat, ConfigDict
 
 # Pydantic models for Visual Analysis
 class Position(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     x: float
     y: float
     width: float
@@ -11,6 +13,8 @@ class Position(BaseModel):
 
 
 class VisualComponent(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     name: str
     component_type: Literal[
         "application", "service", "database", "cache", "queue",
@@ -29,6 +33,8 @@ class VisualComponent(BaseModel):
 
 
 class VisualConnection(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     source: str
     target: str
     connection_type: Literal[
@@ -42,6 +48,8 @@ class VisualConnection(BaseModel):
 
 
 class VisualZone(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     name: str
     boundary_type: Literal[
         "dashed_line", "box", "color", "border", "background", "other"
@@ -50,6 +58,8 @@ class VisualZone(BaseModel):
 
 
 class TextExtraction(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     text: str
     position: Position
     confidence: confloat(ge=0.0, le=1.0) = Field(
@@ -59,6 +69,8 @@ class TextExtraction(BaseModel):
 
 
 class TechnologyDetection(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     technology_name: str
     category: Literal[
         "cloud_service", "database", "framework", "protocol",
@@ -73,6 +85,8 @@ class TechnologyDetection(BaseModel):
 
 
 class DiagramClassification(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     diagram_type: Literal[
         "architecture", "network", "sequence", "flow", "uml",
         "er", "deployment", "component", "infrastructure", "other"
@@ -85,6 +99,8 @@ class DiagramClassification(BaseModel):
 
 
 class ValidationIssue(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     issue_type: Literal[
         "missing_component", "orphan_connection", "duplicate_component",
         "inconsistent_naming", "missing_connection", "invalid_reference", "other"
@@ -95,7 +111,7 @@ class ValidationIssue(BaseModel):
 
 
 class CorrectionSuggestion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     summary: str = Field(..., description="Short description of the correction")
     action: str = Field(..., description="Specific fix or change to apply")
@@ -112,6 +128,8 @@ class CorrectionSuggestion(BaseModel):
 
 
 class ValidationResult(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     is_valid: bool
     issues: List[ValidationIssue]
     corrections: List[CorrectionSuggestion] = Field(default_factory=list)
@@ -122,6 +140,8 @@ class ValidationResult(BaseModel):
 
 
 class InferredRelationship(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     source: str
     target: str
     relationship_type: Literal[
@@ -135,7 +155,7 @@ class InferredRelationship(BaseModel):
 
 
 class LayoutGroup(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     group_name: str = Field(..., description="Name or label for the visual group")
     group_type: Literal[
@@ -158,7 +178,7 @@ class LayoutGroup(BaseModel):
 
 
 class LayoutStructure(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     layout_type: Literal[
         "hierarchical", "layered", "circular", "grid", "freeform", "other"
@@ -171,6 +191,8 @@ class LayoutStructure(BaseModel):
 
 
 class StylingPattern(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     pattern_type: Literal[
         "color_coding", "shape_coding", "line_style", "size_coding", "other"
     ]
@@ -180,6 +202,8 @@ class StylingPattern(BaseModel):
 
 
 class Annotation(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     text: str
     position: Position
     annotation_type: Literal[
@@ -192,7 +216,7 @@ class Annotation(BaseModel):
 
 
 class DiagramComparison(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     added_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
     removed_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
@@ -254,6 +278,8 @@ class MetadataEntry(BaseModel):
 
 
 class DrawIOExport(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     drawio_xml: str
     description: str
     diagram_type: Literal["architecture", "network", "flowchart", "infrastructure", "component", "other"]
@@ -264,7 +290,7 @@ class DrawIOExport(BaseModel):
 
 
 class DiagramChangeDetail(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     element_name: str = Field(
         ..., description="Identifier or label of the element that changed"
@@ -282,7 +308,7 @@ class DiagramChangeDetail(BaseModel):
 
 
 class ImprovementDetail(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     summary: str = Field(..., description="Short label for the improvement")
     action: str = Field(..., description="Specific fix or change performed")
@@ -299,7 +325,7 @@ class ImprovementDetail(BaseModel):
 
 
 class DetectionDetail(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     name: str = Field(..., description="Identifier for the new detection")
     description: str = Field(
@@ -315,7 +341,7 @@ class DetectionDetail(BaseModel):
 
 
 class ConfidenceImprovementEntry(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
     element_name: str = Field(
         ..., description="Element whose confidence was improved"
@@ -327,6 +353,8 @@ class ConfidenceImprovementEntry(BaseModel):
 
 # Models for advanced vision analysis
 class LegendMapping(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     symbol_type: Literal["color", "shape", "line_style", "icon", "pattern", "other"]
     symbol_value: str = Field(..., description="Visual representation (e.g., 'red', 'dashed', 'cylinder')")
     meaning: str = Field(..., description="What this symbol represents")
@@ -334,12 +362,16 @@ class LegendMapping(BaseModel):
 
 
 class LegendExtraction(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     legend_title: str = Field(default="", description="Legend box title if present")
     mappings: List[LegendMapping]
     position: Optional[Position] = None
 
 
 class LineCrossing(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     line1_id: str = Field(..., description="Identifier for first line/connection")
     line2_id: str = Field(..., description="Identifier for second line/connection")
     intersection_point: Position
@@ -353,6 +385,8 @@ class LineCrossing(BaseModel):
 
 
 class TrustBoundary(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     boundary_name: str
     boundary_type: Literal[
         "internet_facing", "dmz", "internal_network", "private_subnet",
@@ -373,6 +407,8 @@ class TrustBoundary(BaseModel):
 
 # Models for image preprocessing
 class ImageQualityAssessment(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     overall_quality: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Overall image quality score (0.0-1.0)"
     )
@@ -385,6 +421,8 @@ class ImageQualityAssessment(BaseModel):
 
 
 class PreprocessingResult(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     original_filename: str
     processed_filename: str
     operations_applied: List[str]
@@ -393,6 +431,8 @@ class PreprocessingResult(BaseModel):
 
 # Models for region-based analysis
 class ImageRegion(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     region_id: str
     position: Position
     region_type: Literal["header", "body", "footer", "zone", "layer", "group"]
@@ -401,6 +441,8 @@ class ImageRegion(BaseModel):
 
 
 class RegionalAnalysis(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     region: ImageRegion
     components: List[VisualComponent] = Field(default_factory=list)
     connections: List[VisualConnection] = Field(default_factory=list)
@@ -409,6 +451,8 @@ class RegionalAnalysis(BaseModel):
 
 
 class ComprehensiveRegionalAnalysis(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     regions: List[RegionalAnalysis]
     merged_components: List[VisualComponent]
     merged_connections: List[VisualConnection]
@@ -418,6 +462,8 @@ class ComprehensiveRegionalAnalysis(BaseModel):
 
 # Model for iterative refinement
 class IterativeAnalysisResult(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     final_analysis: Dict[str, Any]
     iterations_completed: int
     quality_progression: List[float] = Field(

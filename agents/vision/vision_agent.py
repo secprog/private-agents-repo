@@ -4,6 +4,10 @@ Vision Agent - Main entry point using ADK SDK
 
 import os
 import logging
+import warnings
+
+# Suppress Pydantic serialization warnings from LiteLLM internal responses
+warnings.filterwarnings("ignore", message=".*Pydantic serializer warnings.*")
 from google.adk.auth.credential_service.in_memory_credential_service import (
     InMemoryCredentialService,
 )

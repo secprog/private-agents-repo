@@ -1,14 +1,18 @@
 from typing import List, Literal
 
-from pydantic import BaseModel, Field, confloat
+from pydantic import BaseModel, ConfigDict, Field, confloat
 
 # Pydantic models for Visual Analysis
 class Position(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     x: float
     y: float
 
 
 class VisualComponent(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     name: str
     component_type: Literal[
         "database",
@@ -38,6 +42,8 @@ class VisualComponent(BaseModel):
 
 
 class VisualConnection(BaseModel):
+    model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
+
     source: str
     target: str
     connection_type: Literal[

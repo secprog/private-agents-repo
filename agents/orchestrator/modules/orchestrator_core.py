@@ -15,7 +15,8 @@ from google.adk.agents.remote_a2a_agent import (
 )
 from google.adk.models import LiteLlm
 
-from google.adk.tools import load_memory, preload_memory
+from google.adk.tools.load_memory_tool import load_memory_tool as load_memory
+from google.adk.tools.preload_memory_tool import preload_memory_tool as preload_memory
 
 # Model constants
 LLM_MODEL = os.getenv("LLM_MODEL")
