@@ -187,6 +187,9 @@ class AgentPlatform {
         this.sessionArtifactRefs = new Map(); // sessionId -> [{ app, user, session, filename, mime }]
         this.displayedArtifactIds = new Set(); // Track artifact IDs that have been displayed to prevent duplicates
         this.processedTaskArtifacts = new Map(); // Track which tasks have had their artifacts processed (taskId -> Set of artifact content hashes)
+        this.pendingCancelAllConfirm = false; // flag for non-blocking cancel-all confirmation
+        this.pendingCancelAllTimer = null; // timer handle for confirmation window
+        this.cancelAllPromptEl = null; // inline confirmation prompt element
         this.streamingEnabled = localStorage.getItem('streamingEnabled') !== 'false'; // Default to true
         this.toastBehavior = localStorage.getItem('toastBehavior') || 'stack'; // Default to stack
 
@@ -1068,9 +1071,22 @@ class AgentPlatform {
         if (!task || !task.id) return;
 
         const subscriptionInfo = this.extractSubscriptionInfo(task);
+        const state = task.status?.state || null;
 
         if (!subscriptionInfo) {
-            if (this.isTerminalTaskState(task.status?.state)) {
+            // If we have no subscription details but the task is still running/waiting,
+            // keep a minimal record so Cancel All can target it by taskId.
+            if (!this.isTerminalTaskState(state)) {
+                const record = {
+                    taskId: task.id,
+                    subscriptionId: null,
+                    sessionId: context.sessionId,
+                    lastEventId: null,
+                    lastState: state || null,
+                    updatedAt: new Date().toISOString()
+                };
+                this.persistActiveSubscriptionRecord(record, true /* allowMissingSubscription */);
+            } else {
                 this.completeTaskSubscription(task.id);
             }
             return;
@@ -1126,8 +1142,9 @@ class AgentPlatform {
         return null;
     }
 
-    persistActiveSubscriptionRecord(record) {
-        if (!record.taskId || !record.subscriptionId) return;
+    persistActiveSubscriptionRecord(record, allowMissingSubscription = false) {
+        if (!record.taskId) return;
+        if (!record.subscriptionId && !allowMissingSubscription) return;
         this.activeTaskSubscriptions.set(record.taskId, record);
         this.saveActiveTaskSubscriptions();
     }
@@ -1144,7 +1161,7 @@ class AgentPlatform {
         try {
             const stored = JSON.parse(localStorage.getItem(this.activeTaskStorageKey) || '{}');
             Object.values(stored).forEach(record => {
-                if (record.taskId && record.subscriptionId) {
+                if (record.taskId) {
                     this.activeTaskSubscriptions.set(record.taskId, record);
                 }
             });
@@ -1316,10 +1333,13 @@ class AgentPlatform {
                 return;
             }
 
-            // Confirm before cancelling all
-            if (!confirm(`Are you sure you want to cancel all ${activeTasks.length} running task(s)?`)) {
+            // Show inline confirmation prompt instead of blocking alert
+            if (!this.pendingCancelAllConfirm) {
+                this.showCancelAllPrompt(activeTasks.length);
                 return;
             }
+
+            this.teardownCancelAllPrompt();
 
             this.showToast(`Cancelling ${activeTasks.length} task(s)...`, 'info');
             
@@ -1352,6 +1372,83 @@ class AgentPlatform {
         } catch (error) {
             console.error('Error canceling all tasks:', error);
             this.showToast('Failed to cancel all tasks', 'error');
+        }
+    }
+
+    showCancelAllPrompt(count) {
+        // Avoid stacking prompts
+        this.teardownCancelAllPrompt();
+        this.pendingCancelAllConfirm = true;
+
+        const targetBtn = document.getElementById('cancelAllTasksBtn');
+        if (!targetBtn) {
+            this.pendingCancelAllConfirm = false;
+            this.showToast(`Cancel ${count} task(s)?`, 'warning');
+            return;
+        }
+
+        const prompt = document.createElement('div');
+        prompt.className = 'inline-cancel-confirm';
+        prompt.style.display = 'flex';
+        prompt.style.alignItems = 'center';
+        prompt.style.gap = '8px';
+        prompt.style.marginTop = '8px';
+        prompt.style.padding = '10px 12px';
+        prompt.style.borderRadius = '8px';
+        prompt.style.background = 'rgba(255, 99, 71, 0.12)';
+        prompt.style.border = '1px solid rgba(255, 99, 71, 0.45)';
+        prompt.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+
+        const label = document.createElement('span');
+        label.textContent = `Cancel ${count} running task(s)?`;
+        label.style.fontWeight = '600';
+        label.style.color = '#c23b3b';
+
+        const confirmBtn = document.createElement('button');
+        confirmBtn.textContent = 'Yes, cancel all';
+        confirmBtn.className = 'btn btn-danger';
+        confirmBtn.style.minWidth = '120px';
+
+        const keepBtn = document.createElement('button');
+        keepBtn.textContent = 'Keep running';
+        keepBtn.className = 'btn btn-secondary';
+
+        prompt.appendChild(label);
+        prompt.appendChild(confirmBtn);
+        prompt.appendChild(keepBtn);
+
+        targetBtn.parentElement?.insertBefore(prompt, targetBtn.nextSibling);
+        this.cancelAllPromptEl = prompt;
+
+        const cleanup = () => this.teardownCancelAllPrompt();
+
+        confirmBtn.addEventListener('click', async () => {
+            this.pendingCancelAllConfirm = false;
+            cleanup();
+            await this.cancelAllRunningTasks();
+        });
+
+        keepBtn.addEventListener('click', () => {
+            this.pendingCancelAllConfirm = false;
+            cleanup();
+            this.showToast('Keeping tasks running', 'info');
+        });
+
+        // Auto-dismiss after 8s
+        this.pendingCancelAllTimer = setTimeout(() => {
+            this.pendingCancelAllConfirm = false;
+            cleanup();
+        }, 8000);
+    }
+
+    teardownCancelAllPrompt() {
+        if (this.cancelAllPromptEl && this.cancelAllPromptEl.parentElement) {
+            this.cancelAllPromptEl.parentElement.removeChild(this.cancelAllPromptEl);
+        }
+        this.cancelAllPromptEl = null;
+        if (this.pendingCancelAllTimer) {
+            clearTimeout(this.pendingCancelAllTimer);
+            this.pendingCancelAllTimer = null;
         }
     }
 
