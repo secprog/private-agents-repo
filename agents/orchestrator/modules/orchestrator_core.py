@@ -20,9 +20,6 @@ from google.adk.tools.preload_memory_tool import preload_memory_tool as preload_
 
 # Model constants
 LLM_MODEL = os.getenv("LLM_MODEL")
-# Thinking configuration for extended reasoning
-THINKING_BUDGET = int(os.getenv("THINKING_BUDGET", "1024"))  # Token budget for thinking
-INCLUDE_THOUGHTS = os.getenv("INCLUDE_THOUGHTS", "true").lower() == "true"
 
 logger = logging.getLogger(__name__)
 

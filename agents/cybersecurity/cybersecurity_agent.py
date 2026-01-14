@@ -12,7 +12,7 @@ from google.adk.apps.app import App, ResumabilityConfig
 import uvicorn
 from google.adk.planners.built_in_planner import BuiltInPlanner
 from fastapi.middleware.cors import CORSMiddleware
-from google.adk_community.models.openai_llm import OpenAI
+from google.adk.models import LiteLlm
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
 from google.genai import types
@@ -51,7 +51,7 @@ architecture_analysis = ArchitectureAnalysis()
 security_analyzer_sub_agent = Agent(
     name="security_analyzer",
     description="Specialized sub-agent for security analysis of architecture diagrams using comprehensive vision data",
-    model=OpenAI(model="gpt-5.1"),
+    model=LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5.1")),
     instruction="""You are a cybersecurity architecture specialist.
 
 You receive comprehensive visual analysis data from the vision agent including:
@@ -81,7 +81,7 @@ CRITICAL:
 root_agent = Agent(
     name=app_identifier,
     description="Specialized agent for cybersecurity architecture analysis and threat assessment.",
-    model=OpenAI(model="gpt-5.1"),
+    model=LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5.1")),
     instruction="""You are a cybersecurity specialist agent.
     
 Your role is to analyze architecture diagrams for security threats, vulnerabilities, and compliance.
