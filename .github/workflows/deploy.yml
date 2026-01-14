@@ -13,7 +13,7 @@ jobs:
     steps:
       - name: Stop services
         shell: bash
-        run: docker compose -f docker-compose.yml down -d
+        run: docker compose -f docker-compose.yml down
         continue-on-error: true
         timeout-minutes: 10
         
