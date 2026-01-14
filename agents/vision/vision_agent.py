@@ -6,6 +6,8 @@ import os
 import logging
 import warnings
 from google.adk.models import LiteLlm
+from google.genai import types
+from google.adk.planners.built_in_planner import BuiltInPlanner
 
 # Suppress Pydantic serialization warnings from LiteLLM internal responses
 warnings.filterwarnings("ignore", message=".*Pydantic serializer warnings.*")
@@ -17,7 +19,6 @@ from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.apps.app import App, ResumabilityConfig
 import uvicorn
-from google.adk.planners import plan_re_act_planner
 from fastapi.middleware.cors import CORSMiddleware
 from google.adk.tools.function_tool import FunctionTool
 from google.adk.agents import Agent
@@ -32,6 +33,17 @@ logger = logging.getLogger(__name__)
 
 agent_name = "vision-agent"
 agent_identifier = agent_name.replace("-", "_")
+
+# Thinking configuration for extended reasoning
+THINKING_BUDGET = int(os.getenv("THINKING_BUDGET", "1024"))
+INCLUDE_THOUGHTS = os.getenv("INCLUDE_THOUGHTS", "true").lower() == "true"
+
+# Create thinking config for planners
+thinking_config = types.ThinkingConfig(
+    include_thoughts=INCLUDE_THOUGHTS,
+    thinking_budget=THINKING_BUDGET
+)
+
 # Initialize vision agent
 artifact_service = FileArtifactService(
     root_dir=os.getenv("ARTIFACT_ROOT_DIR", "./my_artifacts")
@@ -144,7 +156,7 @@ CRITICAL PRE-CONDITION:
         # Comparison
         FunctionTool(func=vision_analysis.compare_diagrams),
     ],
-    planner=plan_re_act_planner.PlanReActPlanner(),
+    planner=BuiltInPlanner(thinking_config=thinking_config),
 )
 
 merger = Agent(
@@ -174,7 +186,7 @@ IMPORTANT GUARDRAILS:
 - NEVER call any tools when filename/session_id/user_id are missing or unknown. When unsure, do not call tools; ask for an image instead.
 - If no file is present, ask the user to provide one and stop. Do not attempt quality assessment with placeholder values.""",
    sub_agents=[visual_analysis_agent, merger],
-   planner=plan_re_act_planner.PlanReActPlanner(),
+   planner=BuiltInPlanner(thinking_config=thinking_config),
 )
 
 vision_app = App(
