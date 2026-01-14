@@ -13,12 +13,13 @@ from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.apps.app import App, ResumabilityConfig
 from google.adk.artifacts import InMemoryArtifactService
 import uvicorn
-from google.adk.planners import plan_re_act_planner
+from google.adk.planners.built_in_planner import BuiltInPlanner
 from fastapi.middleware.cors import CORSMiddleware
 from google.adk.tools.long_running_tool import LongRunningFunctionTool
 from google.adk.models import LiteLlm
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from google.genai import types
 from rag_analysis import RAGAnalysis
 
 # Initialize logging
@@ -27,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 agent_name = "rag-agent"
 agent_identifier = agent_name.replace("-", "_")
+
+# Thinking configuration for extended reasoning
+THINKING_BUDGET = int(os.getenv("THINKING_BUDGET", "1024"))
+INCLUDE_THOUGHTS = os.getenv("INCLUDE_THOUGHTS", "true").lower() == "true"
+
+# Create thinking config for planners
+thinking_config = types.ThinkingConfig(
+    include_thoughts=INCLUDE_THOUGHTS,
+    thinking_budget=THINKING_BUDGET
+)
 
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
 db_url = os.getenv(
@@ -81,7 +92,7 @@ IMPORTANT:
         LongRunningFunctionTool(func=rag_analysis.hybrid_search),
         LongRunningFunctionTool(func=rag_analysis.graph_based_retrieval),
     ],
-    planner=plan_re_act_planner.PlanReActPlanner(),
+    planner=BuiltInPlanner(thinking_config=thinking_config),
 )
 
 # Create A2A server using ADK SDK directly
@@ -101,7 +112,7 @@ IMPORTANT GUARDRAILS:
 - ONLY delegate to the analyzer when the user wants to search, retrieve, or extract information from documents
 """,
     sub_agents=[rag_analyzer_agent],
-    planner=plan_re_act_planner.PlanReActPlanner(),
+    planner=BuiltInPlanner(thinking_config=thinking_config),
 )
 
 rag_app = App(

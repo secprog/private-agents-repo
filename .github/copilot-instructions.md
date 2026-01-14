@@ -42,7 +42,21 @@ cd frontend && npm install && npm start  # http://localhost:3000
 **1. LiteLLM Usage (non-negotiable):**
 - ✅ Always: `from google.adk.models import LiteLlm` + `llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini"))`
 - ✅ Embeddings: `litellm.embedding(model="text-embedding-3-small", input="text")`
+- ✅ Planner: `from google.adk.planners.built_in_planner import BuiltInPlanner` for native model reasoning
 - ❌ Never: `from openai import OpenAI`, `from anthropic import Anthropic`, direct SDK imports
+
+**1a. Extended Thinking with BuiltInPlanner:**
+- All agents use `BuiltInPlanner` with `ThinkingConfig` to leverage model's built-in reasoning
+- Configuration via environment: `THINKING_BUDGET=1024`, `INCLUDE_THOUGHTS=true`
+- Example:
+  ```python
+  from google.genai import types
+  thinking_config = types.ThinkingConfig(
+      include_thoughts=True,  # Show reasoning steps
+      thinking_budget=1024    # Token budget for thinking
+  )
+  planner = BuiltInPlanner(thinking_config=thinking_config)
+  ```
 
 **2. Agent Discovery & Routing:**
 - Orchestrator discovers agents via environment variables (e.g., `VISION_AGENT_ENDPOINT=http://vision-agent:8002`)
@@ -63,7 +77,7 @@ cd frontend && npm install && npm start  # http://localhost:3000
 **5. Data Flow Pattern:**
 - Vision agent outputs structured JSON (components, connections, zones, inferred tech)
 - CyberSecurity agent receives this JSON and calls `architecture_analysis.analyze_architecture_security(data)`
-- Sub-agents inherit parent agent's tools; delegate via `planner=plan_re_act_planner.PlanReActPlanner()`
+- Sub-agents inherit parent agent's tools; delegate via `planner=BuiltInPlanner(thinking_config=thinking_config)`
 
 ## Integration Points
 
@@ -73,6 +87,10 @@ cd frontend && npm install && npm start  # http://localhost:3000
 OPENAI_API_KEY=sk-... or GOOGLE_API_KEY=AIza...
 LLM_MODEL=openai/gpt-5.2-reasoning  # Orchestrator uses this
 EMBEDDING_MODEL=text-embedding-3-small
+
+# Extended Thinking (BuiltInPlanner)
+THINKING_BUDGET=1024  # Token budget for model reasoning
+INCLUDE_THOUGHTS=true  # Show reasoning steps in responses
 
 # Database
 DATABASE_URL=postgresql+psycopg://admin:admin123@localhost:5432/agent_platform

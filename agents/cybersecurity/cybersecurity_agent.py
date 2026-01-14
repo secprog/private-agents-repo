@@ -10,11 +10,12 @@ from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.adk.apps.app import App, ResumabilityConfig
 import uvicorn
-from google.adk.planners import plan_re_act_planner
+from google.adk.planners.built_in_planner import BuiltInPlanner
 from fastapi.middleware.cors import CORSMiddleware
 from google.adk_community.models.openai_llm import OpenAI
 from google.adk.agents import Agent
 from google.adk.a2a.utils.agent_to_a2a import to_a2a
+from google.genai import types
 from modules.architecture_analysis import ArchitectureAnalysis
 # Initialize logging
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,16 @@ logger = logging.getLogger(__name__)
 
 agent_name = "cybersecurity-agent"
 app_identifier = agent_name.replace("-", "_")
+
+# Thinking configuration for extended reasoning
+THINKING_BUDGET = int(os.getenv("THINKING_BUDGET", "1024"))
+INCLUDE_THOUGHTS = os.getenv("INCLUDE_THOUGHTS", "true").lower() == "true"
+
+# Create thinking config for planners
+thinking_config = types.ThinkingConfig(
+    include_thoughts=INCLUDE_THOUGHTS,
+    thinking_budget=THINKING_BUDGET
+)
 
 # Initialize services
 # Use postgresql+psycopg:// for async driver (psycopg 3.x)
@@ -62,7 +73,7 @@ CRITICAL:
 - Output the complete security analysis in JSON format
 - Prioritize findings by risk level""",
     tools=[architecture_analysis.analyze_architecture_security],
-    planner=plan_re_act_planner.PlanReActPlanner()
+    planner=BuiltInPlanner(thinking_config=thinking_config)
 )
 
 
@@ -85,7 +96,7 @@ You do NOT perform visual analysis yourself. You receive structured JSON data fr
 Delegate all security analysis tasks to the security_analyzer sub-agent.
 Do not modify the input or output data.""",
     sub_agents=[security_analyzer_sub_agent],
-    planner=plan_re_act_planner.PlanReActPlanner()
+    planner=BuiltInPlanner(thinking_config=thinking_config)
 )
 
 cyber_app = App(

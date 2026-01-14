@@ -103,6 +103,40 @@ python cybersecurity_agent.py
 **Always** use:
 - ✅ `from google.adk.models import LiteLlm`
 - ✅ `litellm.embedding()` for embeddings
+- ✅ `from google.adk.planners.built_in_planner import BuiltInPlanner` for native model reasoning
+
+### Extended Thinking with BuiltInPlanner
+
+The platform uses Google ADK's `BuiltInPlanner` to leverage native model reasoning capabilities:
+
+```python
+from google.adk.planners.built_in_planner import BuiltInPlanner
+from google.genai import types
+import os
+
+# Configure extended thinking
+THINKING_BUDGET = int(os.getenv("THINKING_BUDGET", "1024"))
+INCLUDE_THOUGHTS = os.getenv("INCLUDE_THOUGHTS", "true").lower() == "true"
+
+thinking_config = types.ThinkingConfig(
+    include_thoughts=INCLUDE_THOUGHTS,  # Show model's reasoning steps
+    thinking_budget=THINKING_BUDGET      # Token budget for thinking
+)
+
+# Create agent with BuiltInPlanner
+agent = Agent(
+    name="my_agent",
+    model=LiteLlm(model="openai/gpt-5.2"),
+    planner=BuiltInPlanner(thinking_config=thinking_config),
+    tools=[...]
+)
+```
+
+**Key Benefits:**
+- Uses model's native reasoning capabilities (especially Gemini 2.0+)
+- Exposes step-by-step thinking process when `include_thoughts=True`
+- Controls reasoning depth via `thinking_budget` (tokens allocated for internal reasoning)
+- Better than PlanReActPlanner for models with built-in reasoning support
 
 ### Example LLM Usage
 
@@ -162,6 +196,10 @@ LLM_MODEL=openai/gpt-5.2-reasoning  # Used by orchestrator
 EMBEDDING_MODEL=text-embedding-3-small  # Used for embeddings
 OPENAI_API_KEY=sk-...
 GOOGLE_API_KEY=AIza...
+
+# Extended Thinking Configuration (BuiltInPlanner)
+THINKING_BUDGET=1024  # Token budget for model's internal reasoning
+INCLUDE_THOUGHTS=true  # Show model's reasoning steps in responses
 
 # Database
 DATABASE_URL=postgresql://admin:admin123@postgres:5432/agent_platform

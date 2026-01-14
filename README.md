@@ -109,6 +109,10 @@ OPENAI_API_KEY=your-openai-api-key
 GOOGLE_API_KEY=your-google-api-key  # Optional, for Gemini models
 LLM_MODEL=openai/gpt-5.2-reasoning  # Or any LiteLLM-supported model
 
+# Extended Thinking Configuration (for models with built-in reasoning)
+THINKING_BUDGET=1024  # Token budget for model's internal reasoning (default: 1024)
+INCLUDE_THOUGHTS=true  # Whether to include model's reasoning steps in responses (default: true)
+
 # Database Configuration
 DATABASE_URL=postgresql://admin:admin123@postgres:5432/agent_platform
 NEO4J_URI=bolt://neo4j:7687
@@ -387,12 +391,34 @@ Set the `LLM_MODEL` environment variable to any LiteLLM-supported model:
 LLM_MODEL=openai/gpt-5.2-reasoning
 LLM_MODEL=openai/gpt-5-mini
 
-# Google Gemini models
+# Google Gemini models (with native extended thinking support)
 LLM_MODEL=gemini/gemini-2.0-flash
 
 # Azure OpenAI
 LLM_MODEL=azure/gpt-4
 ```
+
+#### Extended Thinking Configuration
+
+The platform uses Google ADK's `BuiltInPlanner` with `ThinkingConfig` to leverage native model reasoning capabilities:
+
+```bash
+# Enable extended thinking with model's built-in reasoning
+THINKING_BUDGET=1024        # Token budget for internal reasoning
+INCLUDE_THOUGHTS=true       # Show model's reasoning steps in responses
+```
+
+**How It Works:**
+- **BuiltInPlanner**: Uses the model's native planning and reasoning capabilities
+- **ThinkingConfig**: Controls how much the model "thinks" before responding
+- **thinking_budget**: Limits tokens allocated for internal reasoning (0 to disable, -1 for automatic)
+- **include_thoughts**: When true, exposes the model's step-by-step reasoning process
+
+**Best Practices:**
+- For Gemini 2.0+ models: Extended thinking is built-in and works seamlessly
+- For OpenAI models: Set a reasonable budget (512-2048 tokens) based on task complexity
+- For simple queries: Lower budget (256-512) for faster responses
+- For complex analysis: Higher budget (1024-2048) for deeper reasoning
 
 #### Usage in Code
 ```python
