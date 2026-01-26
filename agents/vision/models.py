@@ -1,6 +1,6 @@
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field, confloat, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 # Pydantic models for Visual Analysis
 class Position(BaseModel):
@@ -27,7 +27,27 @@ class VisualComponent(BaseModel):
     position: Position
     text_content: str
     visual_group: str
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    primary_color: str = Field(
+        ...,
+        description="Main color of the component (red, blue, green, orange, gray, black, etc.)"
+    )
+    border_style: str = Field(
+        ...,
+        description="Border style: solid, dashed, dotted, double, thick, none"
+    )
+    visual_badges: List[str] = Field(
+        ...,
+        description="Visual icons, symbols, badges visible on or near component"
+    )
+    all_text_labels: List[str] = Field(
+        ...,
+        description="ALL text visible on or near this component"
+    )
+    size_category: Literal["very_small", "small", "medium", "large", "very_large"] = Field(
+        ...,
+        description="Relative size compared to other components"
+    )
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for component identification (0.0-1.0)"
     )
 
@@ -42,7 +62,27 @@ class VisualConnection(BaseModel):
     ]
     direction: Literal["unidirectional", "bidirectional", "unknown"]
     labels: List[str]
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    color: str = Field(
+        ...,
+        description="Color of the connection line"
+    )
+    thickness: Literal["very_thin", "thin", "normal", "thick", "very_thick"] = Field(
+        ...,
+        description="Visual thickness/weight of the line"
+    )
+    line_pattern: str = Field(
+        ...,
+        description="Line pattern: solid, small-dashes, large-dashes, dots, dot-dash"
+    )
+    visual_markers: List[str] = Field(
+        ...,
+        description="Icons or symbols ON the connection line"
+    )
+    all_text_labels: List[str] = Field(
+        ...,
+        description="ALL text on or near the connection"
+    )
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for connection identification (0.0-1.0)"
     )
 
@@ -62,7 +102,7 @@ class TextExtraction(BaseModel):
 
     text: str
     position: Position
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for text extraction (0.0-1.0)"
     )
     text_type: Literal["label", "annotation", "note", "title", "metadata", "other"]
@@ -76,7 +116,7 @@ class TechnologyDetection(BaseModel):
         "cloud_service", "database", "framework", "protocol",
         "tool", "language", "platform", "other"
     ]
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for technology detection (0.0-1.0)"
     )
     indicators: List[str] = Field(
@@ -93,7 +133,7 @@ class DiagramClassification(BaseModel):
     ]
     notation_standard: Literal["c4", "uml", "archimate", "bpmn", "custom", "unknown"]
     style: str = Field(..., description="Description of diagram style (e.g., 'AWS style', 'hand-drawn', 'formal')")
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for classification (0.0-1.0)"
     )
 
@@ -134,7 +174,7 @@ class ValidationResult(BaseModel):
     issues: List[ValidationIssue]
     corrections: List[CorrectionSuggestion]
     suggestions: List[str]
-    quality_score: confloat(ge=0.0, le=1.0) = Field(
+    quality_score: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Overall quality score (0.0-1.0)"
     )
 
@@ -148,7 +188,7 @@ class InferredRelationship(BaseModel):
         "depends_on", "uses", "contains", "communicates_with",
         "transforms", "stores", "monitors", "other"
     ]
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for inferred relationship (0.0-1.0)"
     )
     reasoning: str = Field(..., description="Why this relationship was inferred")
@@ -172,7 +212,7 @@ class LayoutGroup(BaseModel):
         default=None,
         description="Bounding box describing the group's visual region if available",
     )
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         default=0.0, description="Confidence score for the group identification"
     )
 
@@ -210,7 +250,7 @@ class Annotation(BaseModel):
         "note", "warning", "callout", "comment", "label", "other"
     ]
     associated_element: str = Field(default="", description="Component/connection this annotation refers to")
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for annotation extraction (0.0-1.0)"
     )
 
@@ -222,7 +262,7 @@ class DiagramComparison(BaseModel):
     removed_elements: List["DiagramChangeDetail"]
     modified_elements: List["DiagramChangeDetail"]
     unchanged_elements: List["DiagramChangeDetail"]
-    similarity_score: confloat(ge=0.0, le=1.0) = Field(
+    similarity_score: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Overall similarity score (0.0-1.0)"
     )
 
@@ -236,7 +276,7 @@ class EnhancedAnalysis(BaseModel):
     improvements: List["ImprovementDetail"]
     new_detections: List["DetectionDetail"]
     confidence_improvements: List["ConfidenceImprovementEntry"]
-    quality_score: confloat(ge=0.0, le=1.0) = Field(
+    quality_score: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Improved quality score (0.0-1.0)"
     )
 
@@ -245,14 +285,14 @@ class EnhancedAnalysis(BaseModel):
 class OCRTextResult(BaseModel):
     text: str
     position: Position
-    confidence: confloat(ge=0.0, le=1.0)
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
     source: Literal["paddleocr", "gpt4o", "consensus"]
 
 
 class ConsensusTextResult(BaseModel):
     texts: List[OCRTextResult]
     conflicts: List[Dict[str, Any]] = Field(default_factory=list)
-    overall_confidence: confloat(ge=0.0, le=1.0)
+    overall_confidence: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 # Models for export tools
@@ -329,7 +369,7 @@ class DetectionDetail(BaseModel):
     description: str = Field(
         default="", description="Explanation of the detected element"
     )
-    confidence: confloat(ge=0.0, le=1.0) = Field(
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         default=0.0, description="Confidence in this detection"
     )
     attributes: List[MetadataEntry] = Field(
@@ -344,7 +384,7 @@ class ConfidenceImprovementEntry(BaseModel):
     element_name: str = Field(
         ..., description="Element whose confidence was improved"
     )
-    new_confidence: confloat(ge=0.0, le=1.0) = Field(
+    new_confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Updated confidence score for the element"
     )
 
@@ -356,7 +396,7 @@ class LegendMapping(BaseModel):
     symbol_type: Literal["color", "shape", "line_style", "icon", "pattern", "other"]
     symbol_value: str = Field(..., description="Visual representation (e.g., 'red', 'dashed', 'cylinder')")
     meaning: str = Field(..., description="What this symbol represents")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Confidence in mapping")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Confidence in mapping")
 
 
 class LegendExtraction(BaseModel):
@@ -379,41 +419,56 @@ class LineCrossing(BaseModel):
     has_bridge_symbol: bool = Field(
         ..., description="Whether there's a bridge/tunnel symbol at crossing"
     )
-    confidence: confloat(ge=0.0, le=1.0)
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
-class TrustBoundary(BaseModel):
+class VisualBoundary(BaseModel):
+    """Generic visual boundary/enclosure extracted from diagram"""
     model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
 
-    boundary_name: str
-    boundary_type: Literal[
-        "internet_facing", "dmz", "internal_network", "private_subnet",
-        "public_subnet", "security_zone", "trust_zone", "other"
-    ]
-    position: Position
+    boundary_name: str = Field(
+        ...,
+        description="Text label on or near the boundary (exact text as shown)"
+    )
+    visual_style: str = Field(
+        ...,
+        description="Visual appearance: 'dashed red line', 'thick blue border', 'shaded gray region'"
+    )
+    color: str = Field(
+        ...,
+        description="Primary color of the boundary"
+    )
+    line_style: Literal["solid", "dashed", "dotted", "double", "other"] = Field(
+        ...,
+        description="Style of the boundary line"
+    )
+    shape: Literal["rectangle", "rounded_rectangle", "circle", "ellipse", "cloud", "irregular", "other"] = Field(
+        ...,
+        description="Overall shape of the boundary"
+    )
+    text_labels: List[str] = Field(
+        ...,
+        description="ALL text written on or near this boundary"
+    )
     components_inside: List[str] = Field(
-        ..., description="Components within this boundary"
+        ...,
+        description="Names of components visually enclosed by this boundary"
     )
-    security_level: Literal["public", "restricted", "confidential", "highly_confidential"] = Field(
-        ..., description="Security classification"
-    )
-    protection_mechanisms: List[str] = Field(
-        ..., description="Firewalls, WAF, etc. protecting this boundary"
-    )
-    confidence: confloat(ge=0.0, le=1.0)
+    position: Position
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 # Models for image preprocessing
 class ImageQualityAssessment(BaseModel):
     model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
 
-    overall_quality: confloat(ge=0.0, le=1.0) = Field(
+    overall_quality: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Overall image quality score (0.0-1.0)"
     )
     resolution: str = Field(..., description="Image resolution (e.g., '1920x1080')")
-    clarity: confloat(ge=0.0, le=1.0) = Field(..., description="Clarity score")
-    brightness: confloat(ge=0.0, le=1.0) = Field(..., description="Brightness adequacy")
-    contrast: confloat(ge=0.0, le=1.0) = Field(..., description="Contrast adequacy")
+    clarity: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Clarity score")
+    brightness: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Brightness adequacy")
+    contrast: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Contrast adequacy")
     issues: List[str] = Field(default_factory=list, description="Quality issues detected")
     recommendations: List[str] = Field(default_factory=list)
 
@@ -435,7 +490,7 @@ class ImageRegion(BaseModel):
     position: Position
     region_type: Literal["header", "body", "footer", "zone", "layer", "group"]
     description: str
-    complexity_score: confloat(ge=0.0, le=1.0)
+    complexity_score: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class RegionalAnalysis(BaseModel):
@@ -445,7 +500,7 @@ class RegionalAnalysis(BaseModel):
     components: List[VisualComponent] = Field(default_factory=list)
     connections: List[VisualConnection] = Field(default_factory=list)
     zones: List[VisualZone] = Field(default_factory=list)
-    quality_score: confloat(ge=0.0, le=1.0)
+    quality_score: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class ComprehensiveRegionalAnalysis(BaseModel):
@@ -455,7 +510,7 @@ class ComprehensiveRegionalAnalysis(BaseModel):
     merged_components: List[VisualComponent]
     merged_connections: List[VisualConnection]
     merged_zones: List[VisualZone]
-    overall_quality: confloat(ge=0.0, le=1.0)
+    overall_quality: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 # Model for iterative refinement
@@ -468,5 +523,5 @@ class IterativeAnalysisResult(BaseModel):
         default_factory=list, description="Quality score at each iteration"
     )
     improvements_made: List[str] = Field(default_factory=list)
-    final_quality_score: confloat(ge=0.0, le=1.0)
+    final_quality_score: Annotated[float, Field(ge=0.0, le=1.0)]
 

@@ -32,27 +32,27 @@ class ArchitectureAnalysis:
         components_json: str,
         connections_json: str,
         zones_json: str,
-        trust_boundaries_json: str,
-        technologies_json: str,
-        relationships_json: str,
+        boundaries_json: str,
+        technologies_json: str = "[]",
+        relationships_json: str = "[]",
         annotations_json: str = "[]",
         legend_mappings_json: str = "[]",
         line_crossings_json: str = "[]"
     ) -> str:
         """
         Comprehensive security analysis of architecture using rich vision data.
-        
+
         Args:
             components_json: Visual components from vision agent
             connections_json: Visual connections from vision agent
             zones_json: Visual zones from vision agent
-            trust_boundaries_json: Trust boundaries from vision agent
+            boundaries_json: Visual boundaries from vision agent
             technologies_json: Detected technologies from vision agent
             relationships_json: Inferred relationships from vision agent
             annotations_json: Optional annotations from vision agent
             legend_mappings_json: Optional legend mappings from vision agent
             line_crossings_json: Optional line crossings from vision agent
-            
+
         Returns:
             JSON string containing ComprehensiveSecurityAnalysis
         """
@@ -63,7 +63,7 @@ class ArchitectureAnalysis:
             self._validate_json_input("components", components_json)
             self._validate_json_input("connections", connections_json)
             self._validate_json_input("zones", zones_json)
-            self._validate_json_input("trust_boundaries", trust_boundaries_json)
+            self._validate_json_input("boundaries", boundaries_json)
             self._validate_json_input("technologies", technologies_json)
             self._validate_json_input("relationships", relationships_json)
             
@@ -72,7 +72,7 @@ class ArchitectureAnalysis:
                 components_json,
                 connections_json,
                 zones_json,
-                trust_boundaries_json,
+                boundaries_json,
                 technologies_json,
                 relationships_json,
                 annotations_json,
@@ -156,7 +156,7 @@ class ArchitectureAnalysis:
         components_json: str,
         connections_json: str,
         zones_json: str,
-        trust_boundaries_json: str,
+        boundaries_json: str,
         technologies_json: str,
         relationships_json: str,
         annotations_json: str,
@@ -164,7 +164,7 @@ class ArchitectureAnalysis:
         line_crossings_json: str
     ) -> str:
         """Build comprehensive context string for LLM analysis"""
-        
+
         context = """# Architecture Security Analysis Request
 
 Please analyze the following architecture data and provide a comprehensive security assessment.
@@ -187,10 +187,11 @@ Logical zones and regions in the architecture:
 {zones}
 ```
 
-## Trust Boundaries
-Security and trust boundaries (DMZ, VPC, network segments):
+## Visual Boundaries
+Visual boundaries and enclosures (zones, regions, groupings):
+Note: Interpret text_labels, colors, and visual styles to identify security zones, trust boundaries, network segments, etc.
 ```json
-{trust_boundaries}
+{boundaries}
 ```
 
 ## Detected Technologies
@@ -225,14 +226,20 @@ Network topology and line crossing analysis:
 
 ---
 
+IMPORTANT: The Visual Boundaries section contains generic visual data. You must INTERPRET:
+- text_labels like "DMZ", "Public", "Internet-Facing" → security zones
+- Red/orange dashed boundaries → often indicate exposed/public zones
+- Blue/green boundaries → often indicate protected/internal zones
+- Components_inside → which components are in each security zone
+
 Based on this comprehensive data, perform a thorough security analysis and identify threats, vulnerabilities, attack paths, compliance issues, and provide actionable recommendations.
 """
-        
+
         return context.format(
             components=components_json,
             connections=connections_json,
             zones=zones_json,
-            trust_boundaries=trust_boundaries_json,
+            boundaries=boundaries_json,
             technologies=technologies_json,
             relationships=relationships_json,
             annotations=annotations_json,

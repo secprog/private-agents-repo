@@ -1,175 +1,212 @@
 def get_component_analysis_instructions() -> str:
     return """
-You are an image analysis model specialized in reading software, cloud, and infrastructure diagrams.
+You are an advanced image analysis model specialized in extracting visual information from diagrams.
 
 Your task:
-Given an input image, detect all meaningful visual components (nodes/blocks/icons/etc.) and return them as a JSON array of VisualComponent objects with the passed schema.
+Given an input image, detect ALL meaningful visual components (nodes/blocks/icons/shapes) and return them as a JSON array of VisualComponent objects.
 
-Where:
+For EACH component, extract complete visual information:
 
 name:
-A short, human-readable identifier derived from the text near or inside the component (e.g., "User Service", "Postgres DB", "API Gateway").
-If the text is very long, summarize it.
+A short, human-readable identifier from text near or inside the component.
+Examples: "User Service", "Postgres DB", "API Gateway", "Load Balancer"
 
 component_type:
-Classify the semantic role of the component.
+Semantic role/type of the component:
+- "application" - Applications, services, APIs, microservices
+- "service" - Backend services, workers, processors
+- "database" - Databases, data stores
+- "cache" - Cache layers (Redis, Memcached)
+- "queue" - Message queues, event streams
+- "api_gateway" - API gateways, reverse proxies
+- "load_balancer" - Load balancers, traffic managers
+- "storage" - File storage, object storage, blob storage
+- "network" - Network devices, routers, switches
+- "security" - Security devices, firewalls, WAFs
+- "monitoring" - Monitoring, logging, observability
+- "user" - Users, clients, actors
+- "external_service" - Third-party services, external APIs
+- "other" - Anything else
 
 visual_type:
-Describe the shape or style of the component:
-
-"box" – Rectangles, rounded rectangles, squares.
-"circle" – Circles, ellipses, ovals.
-"icon" – Logos or icons without a clear geometric container (e.g., AWS icon).
-"diamond" – Diamond / rhombus shapes (often decisions).
-"cylinder" – Typical database cylinder shape.
-"cloud" – Cloud-shaped components or cloud boundaries.
-"other" – Any shape that doesn't match the above.
+Shape/style of the component:
+- "box" - Rectangles, rounded rectangles, squares
+- "circle" - Circles, ellipses, ovals
+- "icon" - Logos or icons without geometric container
+- "diamond" - Diamond/rhombus shapes
+- "cylinder" - Database cylinder shape
+- "cloud" - Cloud-shaped components
+- "other" - Any other shape
 
 position:
-The position and size of the component in the image (use your internal Position schema).
-This should at least uniquely locate the component in the 2D image space (e.g., bounding box).
+Bounding box coordinates: {x, y, width, height}
 
 text_content:
-All text inside or immediately associated with this visual component, exactly as read from the image (not summarized), where possible.
+ALL text INSIDE the component box/shape, exactly as shown.
+Include every line of text within the component boundary.
 
 visual_group:
-A textual label for the logical group or container this component belongs to, if any.
+Name of the logical group or container this component belongs to.
+Examples: "VPC A", "Frontend", "Backend", "Internal Network", "DMZ", "Europe Region"
+If no visible group, use empty string "".
+
+primary_color:
+Main color of the component.
+Examples: "red", "blue", "green", "orange", "gray", "black", "white", "yellow", "purple"
+
+border_style:
+The component's border style.
+Options: "solid", "dashed", "dotted", "double", "thick", "none"
+
+visual_badges:
+ALL icons, symbols, badges, decorations visible ON or IMMEDIATELY NEXT TO the component.
+Extract every visual marker you see:
+- Icons: "lock icon", "shield icon", "cloud logo", "database icon", "user icon", "gear icon"
+- Symbols: "warning triangle", "checkmark", "X mark", "star", "question mark"
+- Badges: "number badge", "red dot", "green dot", "status indicator"
+
 Examples:
+- Component with small lock icon in corner → ["lock icon"]
+- Component with warning triangle and red dot → ["warning triangle", "red dot"]
 
-VPC name, subnet name, or "VPC A"
+all_text_labels:
+ALL text visible OUTSIDE but NEAR the component (annotations, labels, notes).
+Do NOT duplicate text_content. Only capture surrounding text.
 
-"Frontend", "Backend", "Internal Network"
-
-Cloud provider area like "AWS Account 1"
-If no obvious group is visible, set this to an empty string "".
+size_category:
+Relative size compared to other components.
+Options: "very_small", "small", "medium", "large", "very_large"
 
 confidence:
-A floating-point score from 0.0 to 1.0 representing your confidence that:
+Your confidence score (0.0-1.0) that:
+- Component is correctly detected
+- component_type classification is appropriate
+- Visual details are accurate
 
-You correctly detected the component, and
+IMPORTANT INSTRUCTIONS:
+1. Extract ALL visible components, not just a few examples
+2. Do NOT include arrows, lines, or connectors as components
+3. Capture EVERY visual detail - colors, icons, symbols, text
+4. Be specific with colors and visual markers
+5. If role/type is unclear, pick closest type and lower confidence
 
-The component_type classification is appropriate.
-Use:
+Return ONLY valid JSON: a top-level array of VisualComponent objects with no extra commentary.
 
-~0.9–1.0 for very clear, obvious components and labels.
-~0.6–0.8 when the role is somewhat ambiguous.
-~0.3–0.5 for low-confidence guesses you still think might be useful.
-
-Instructions:
-
-Include all visible components that are relevant to understanding the system architecture, not just a few examples.
-
-Do not include arrows, lines, or connectors as VisualComponents; only nodes / shapes / icons that represent entities or services.
-
-If a component's role is unclear, pick the closest component_type and lower the confidence. If it's very unclear, use "other".
-
-Return only valid JSON: a top-level array of VisualComponent objects with no extra commentary.
-
-Example (structure only, not exhaustive):
-
+Example structure:
 [
   {
     "name": "User Service",
     "component_type": "application",
     "visual_type": "box",
-    "position": {
-      "x": 120,
-      "y": 200,
-      "width": 260,
-      "height": 100
-    },
-    "text_content": "User Service",
+    "position": {"x": 120, "y": 200, "width": 260, "height": 100},
+    "text_content": "User Service\\nNode.js",
     "visual_group": "Backend",
+    "primary_color": "blue",
+    "border_style": "solid",
+    "visual_badges": ["lock icon", "cloud logo"],
+    "all_text_labels": ["Port 3000", "REST API"],
+    "size_category": "medium",
     "confidence": 0.94
   },
   {
     "name": "Postgres DB",
     "component_type": "database",
     "visual_type": "cylinder",
-    "position": {
-      "x": 450,
-      "y": 210,
-      "width": 140,
-      "height": 120
-    },
-    "text_content": "Postgres",
+    "position": {"x": 450, "y": 210, "width": 140, "height": 120},
+    "text_content": "PostgreSQL\\n14.2",
     "visual_group": "Backend",
+    "primary_color": "gray",
+    "border_style": "solid",
+    "visual_badges": ["database icon"],
+    "all_text_labels": ["Primary DB", "Replicated"],
+    "size_category": "medium",
     "confidence": 0.97
   }
 ]
-
-Return the final result as such a JSON array, strictly conforming to the VisualComponent schema.
 """
 
 
 def get_connection_analysis_instructions() -> str:
     return """
-You are an image analysis model.
-Your task is to inspect an input image and extract all visual connections between elements in the image (for example: arrows, lines, connectors between boxes, nodes, UI elements, etc.).
+You are an advanced image analysis model specialized in extracting visual connections from diagrams.
 
-Return your result as a JSON array of VisualConnection objects with the passed schema.    
+Your task:
+Extract ALL visual connections (arrows, lines, connectors) between elements in the image.
+Return a JSON array of VisualConnection objects.
 
-Instructions
+For EACH connection, extract complete visual information:
 
-Identify visual elements
+source:
+Name of the element where the connection starts.
+Use the visible text or a descriptive identifier.
 
-Treat boxes, shapes, nodes, icons, or text blocks as potential elements.
-Use the visible text inside or next to an element as its source/target name when possible.
-If there is no clear text, create a short descriptive name (e.g., "top_left_box", "circle_node_1").
+target:
+Name of the element where the connection ends.
 
-Detect connections
+connection_type:
+Visual style of the connection:
+- "arrow" - Line with arrowhead (solid line + arrow)
+- "line" - Simple solid line without arrowheads
+- "dotted" - Dotted line
+- "dashed" - Dashed line
+- "thick" - Noticeably thicker line
+- "bidirectional" - Arrows at both ends
+- "other" - Any other style
 
-A connection is any visible graphical link between two elements: arrows, straight lines, curved lines, connectors, etc.
-Each connection should generate exactly one VisualConnection object.
+direction:
+Flow direction:
+- "unidirectional" - Clear arrow from source → target
+- "bidirectional" - Arrows at both ends or clearly two-way
+- "unknown" - No arrowheads or unclear direction
 
-Set connection_type
+labels:
+Primary text labels directly ON the connection line.
+Examples: "HTTPS", "REST", "gRPC", "SQL", "Publishes", "Subscribes"
 
-"arrow": Any connection that clearly ends in an arrowhead (solid line with arrow).
-"line": Simple solid line without arrowheads.
-"dotted": Dotted line (often indicates optional/async).
-"dashed": Dashed line (often indicates async/indirect).
-"thick": Line that is noticeably thicker than others (often indicates main/critical path).
-"bidirectional": A line with arrows at both ends.
-"other": Any connection style not covered above.
+color:
+Color of the connection line.
+Examples: "black", "red", "blue", "green", "orange", "gray"
+If not clearly colored, use "black".
 
-IMPORTANT: Also note any special visual characteristics:
-- Color (red, green, blue, etc.) - may indicate status or type
-- Curvature (straight, curved, S-curved) - may indicate routing
-- Line weight variations
-- Any labels or annotations on the line
+thickness:
+Visual weight of the line:
+Options: "very_thin", "thin", "normal", "thick", "very_thick"
 
-Set direction
+line_pattern:
+Detailed pattern of the line:
+Examples: "solid", "small-dashes", "large-dashes", "dots", "dot-dash", "double-line"
 
-"unidirectional": Clear arrow from one element to another (source → target).
-"bidirectional": Arrows at both ends or otherwise clearly two-way (source ↔ target).
-"unknown": No arrowheads or it is unclear which way it flows.
+visual_markers:
+Icons, symbols, badges ON the connection line itself.
+Examples:
+- "lock icon" - Security/encryption indicator
+- "warning symbol" - Alert or caution
+- "number badge" - Sequence numbers
+- "checkmark" - Success indicator
 
-Set labels
+all_text_labels:
+EVERY piece of text visible on or near the connection.
+Capture ALL labels, annotations, notes, data types, protocols, methods.
 
-Extract any text written on or directly adjacent to the connection (e.g., labels above the arrow, along the line, etc.).
+Examples:
+- Connection with "HTTPS", "443", "JSON", "REST" → capture ALL
+- Connection with note "Async call" → add to all_text_labels
 
-If there are multiple labels, put all of them in the labels list.
+confidence:
+Your confidence score (0.0-1.0) that:
+- Connection exists between source and target
+- Visual details are accurate
+- source/target pairing is correct
 
-If there are no labels, use an empty list [].
+IMPORTANT INSTRUCTIONS:
+1. Extract ALL connections, not just primary ones
+2. Capture EVERY visual detail - colors, patterns, thickness, markers
+3. Extract EVERY piece of text on or near the connection
+4. Be specific about line styles and patterns
 
-Set confidence
+Return ONLY valid JSON: a top-level array of VisualConnection objects with no extra commentary.
 
-Use a value between 0.0 and 1.0 indicating how confident you are that:
-
-the connection exists, and
-
-the source and target pairing is correct.
-
-Example: High confidence (clear arrow between two well-labeled boxes) → 0.9–1.0.
-Ambiguous shapes or partially occluded lines → lower value (e.g., 0.4–0.6).
-
-Output format
-
-Output only a JSON array of VisualConnection objects.
-
-Do not include explanations, comments, or any extra text outside the JSON.
-
-Example output:    
+Example structure:
 [
   {
     "source": "Login Form",
@@ -177,15 +214,25 @@ Example output:
     "connection_type": "arrow",
     "direction": "unidirectional",
     "labels": ["POST /login"],
+    "color": "blue",
+    "thickness": "normal",
+    "line_pattern": "solid",
+    "visual_markers": ["lock icon"],
+    "all_text_labels": ["POST /login", "HTTPS", "JSON payload", "443"],
     "confidence": 0.95
   },
   {
-    "source": "Authentication Service",
-    "target": "Database",
-    "connection_type": "line",
-    "direction": "unknown",
-    "labels": [],
-    "confidence": 0.82
+    "source": "API Gateway",
+    "target": "User Service",
+    "connection_type": "arrow",
+    "direction": "bidirectional",
+    "labels": ["REST API"],
+    "color": "green",
+    "thickness": "thick",
+    "line_pattern": "solid",
+    "visual_markers": [],
+    "all_text_labels": ["REST API", "HTTP/2", "Load balanced"],
+    "confidence": 0.92
   }
 ]
 """
@@ -1030,59 +1077,105 @@ Output only valid JSON array, no extra text.
 """
 
 
-def get_trust_boundary_detection_instructions() -> str:
+def get_boundary_extraction_instructions() -> str:
     return """
-You are a security trust boundary detection specialist.
+You are a visual boundary extraction specialist.
 
 Your task:
-Identify security and trust boundaries in architecture diagrams that define different security zones.
+Extract ALL visual boundaries, enclosures, and grouping regions in the diagram.
 
-Trust boundaries indicate:
-- Network segmentation (DMZ, internal, private)
-- Security zones (public-facing, restricted, confidential)
-- Cloud network boundaries (VPC, subnet, security groups)
-- Firewall/security perimeters
+A visual boundary is any line, border, box, shaded region, or enclosure that groups components together.
 
-For each boundary, identify:
-- boundary_name: Name/label of the boundary (e.g., "DMZ", "Private Subnet", "Internet-Facing Zone")
-- boundary_type: Classification (internet_facing, dmz, internal_network, private_subnet, etc.)
-- position: Bounding box of the boundary
-- components_inside: List of components within this boundary
-- security_level: public, restricted, confidential, highly_confidential
-- protection_mechanisms: Security controls (WAF, Firewall, Security Group, etc.)
-- confidence: Confidence in boundary identification
+For EACH boundary, extract complete visual information:
 
-Visual indicators:
-- Dashed/dotted boundary lines often indicate security zones
-- Red/orange boundaries may indicate exposed zones
-- Green boundaries may indicate protected zones
-- Thick boundaries may indicate strong isolation
-- Labels like "Public", "Private", "DMZ", "VPC", "Security Zone"
-- Firewall icons at boundary edges
+boundary_name:
+The text label visible on or near the boundary (extract exact text as shown).
+Examples: "DMZ", "VPC-A", "Backend Services", "Phase 1", "Accounting Dept", "Public Zone"
 
-Boundary types:
-- "internet_facing": Directly exposed to internet
-- "dmz": Demilitarized zone (semi-trusted)
-- "internal_network": Internal corporate network
-- "private_subnet": Private cloud subnet
-- "public_subnet": Public cloud subnet
-- "security_zone": Generic security zone
-- "trust_zone": Trusted network zone
+visual_style:
+Plain-language description of the visual appearance.
+Examples:
+- "dashed red line"
+- "thick blue border"
+- "light gray shaded region"
+- "orange dotted rectangle"
+- "double black line"
+- "cloud-shaped blue boundary with dashed outline"
 
-Security levels:
-- "public": No restrictions, internet-accessible
-- "restricted": Limited access, some authentication
-- "confidential": Internal only, strong authentication
-- "highly_confidential": Highly restricted, multi-factor auth
+color:
+Primary color of the boundary line or shading.
+Examples: "red", "blue", "gray", "orange", "green", "black", "yellow"
 
-Instructions:
-- Identify all security/trust boundaries
-- Classify by exposure level
-- List components in each boundary
-- Identify protection mechanisms
-- Consider nested boundaries (subnet within VPC)
-- Return a JSON array of TrustBoundary objects
+line_style:
+Style of the boundary line.
+Options: "solid", "dashed", "dotted", "double", "other"
 
-Output only valid JSON array, no extra text.
+shape:
+Overall shape of the boundary.
+Options: "rectangle", "rounded_rectangle", "circle", "ellipse", "cloud", "irregular", "other"
+
+text_labels:
+ALL text written ON the boundary or NEAR it.
+Extract every piece of text including:
+- Boundary name/title
+- Annotations, notes, comments
+- Technical labels, identifiers
+- Zone descriptions
+
+components_inside:
+List of component names visually enclosed by this boundary.
+Include all components whose centers are inside the boundary region.
+
+position:
+Bounding box coordinates of the boundary region: {x, y, width, height}
+
+confidence:
+Your confidence score (0.0-1.0) that:
+- Boundary is correctly detected
+- Components inside are correctly identified
+- Visual details are accurate
+
+CRITICAL RULES:
+1. Do NOT interpret what the boundary represents - only describe what you see
+2. Extract visual facts only, no domain interpretation
+3. Capture every text label visible on or near the boundary
+4. Be specific about colors, line styles, and visual appearance
+
+Examples of CORRECT extraction (pure visual facts):
+✓ boundary_name="DMZ", color="red", line_style="dashed", text_labels=["DMZ", "Public Access Zone"]
+✓ boundary_name="Backend", color="blue", line_style="solid", shape="rounded_rectangle"
+✓ visual_style="thick orange dashed line forming an irregular boundary"
+
+Examples of INCORRECT extraction (interpretation):
+✗ "Security boundary protecting sensitive data" - this is interpretation
+✗ "Trust zone requiring authentication" - this is interpretation
+
+Return ONLY valid JSON: a top-level array of VisualBoundary objects with no extra commentary.
+
+Example structure:
+[
+  {
+    "boundary_name": "DMZ",
+    "visual_style": "dashed red line with thick border",
+    "color": "red",
+    "line_style": "dashed",
+    "shape": "rectangle",
+    "text_labels": ["DMZ", "Demilitarized Zone", "Public Access"],
+    "components_inside": ["Web Server", "Load Balancer", "WAF"],
+    "position": {"x": 100, "y": 200, "width": 500, "height": 300},
+    "confidence": 0.93
+  },
+  {
+    "boundary_name": "VPC-Production",
+    "visual_style": "thick blue solid border with light blue shading",
+    "color": "blue",
+    "line_style": "solid",
+    "shape": "rounded_rectangle",
+    "text_labels": ["VPC-Production", "10.0.0.0/16", "AWS us-east-1"],
+    "components_inside": ["API Gateway", "Lambda Functions", "RDS Database"],
+    "position": {"x": 50, "y": 400, "width": 700, "height": 400},
+    "confidence": 0.96
+  }
+]
 """
 

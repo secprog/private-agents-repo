@@ -7,6 +7,7 @@ import json
 import os
 import asyncio
 import re
+from typing import Any
 
 
 from google.adk.artifacts import BaseArtifactService
@@ -22,10 +23,7 @@ from prompts import (
     get_connection_analysis_instructions,
     get_zone_analysis_instructions,
     get_text_extraction_instructions,
-    get_technology_detection_instructions,
-    get_diagram_classification_instructions,
     get_validation_instructions,
-    get_relationship_inference_instructions,
     get_layout_analysis_instructions,
     get_styling_analysis_instructions,
     get_annotation_extraction_instructions,
@@ -38,17 +36,14 @@ from prompts import (
     get_region_identification_instructions,
     get_legend_extraction_instructions,
     get_line_crossing_detection_instructions,
-    get_trust_boundary_detection_instructions,
+    get_boundary_extraction_instructions,
 )
 from models import (
     VisualComponent,
     VisualConnection,
     VisualZone,
     TextExtraction,
-    TechnologyDetection,
-    DiagramClassification,
     ValidationResult,
-    InferredRelationship,
     LayoutStructure,
     StylingPattern,
     Annotation,
@@ -63,7 +58,7 @@ from models import (
     ImageRegion,
     LegendExtraction,
     LineCrossing,
-    TrustBoundary,
+    VisualBoundary,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,11 +72,13 @@ class VisionAnalysis:
         logger.info(
             f"VisionAnalysis initialized with artifact service: {type(artifact_service)}"
         )
-        if hasattr(artifact_service, "service_type"):
-            logger.info(f"Artifact service type: {artifact_service.service_type}")
-        if hasattr(artifact_service, "artifact_service"):
+        service_type = getattr(artifact_service, "service_type", None)
+        if service_type is not None:
+            logger.info(f"Artifact service type: {service_type}")
+        underlying_service = getattr(artifact_service, "artifact_service", None)
+        if underlying_service is not None:
             logger.info(
-                f"Underlying artifact service: {type(artifact_service.artifact_service)}"
+                f"Underlying artifact service: {type(underlying_service)}"
             )
 
     async def _perform_visual_analysis(
@@ -89,7 +86,7 @@ class VisionAnalysis:
         user_id: str,
         session_id: str,
         filename: str,
-        visual_schema: BaseModel,
+        visual_schema: type[BaseModel],
         system_instruction: str,
     ) -> str:
         """Perform visual analysis using LLM with structured output"""
@@ -182,7 +179,7 @@ class VisionAnalysis:
                 # Collect all text parts in case there are multiple
                 text_parts = []
                 for content_part in llm_response.content.parts:
-                    part_summary = {
+                    part_summary: dict[str, Any] = {
                         "part_type": type(content_part).__name__,
                     }
                     text_value = getattr(content_part, "text", None)
@@ -223,9 +220,6 @@ class VisionAnalysis:
             # Check finish reason to detect truncation (update from last response)
             if hasattr(llm_response, "finish_reason"):
                 finish_reason = llm_response.finish_reason
-            elif hasattr(llm_response, "candidates") and llm_response.candidates:
-                if hasattr(llm_response.candidates[0], "finish_reason"):
-                    finish_reason = llm_response.candidates[0].finish_reason
 
             response_debug_info.append(
                 {
@@ -370,63 +364,6 @@ class VisionAnalysis:
             logger.error(f"Failed to run bundled core analysis: {e}")
             raise
 
-    async def run_enhancement_analysis_parallel(
-        self, user_id: str, session_id: str, filename: str
-    ) -> str:
-        """
-        Run technology detection, diagram classification, and annotation extraction
-        in parallel and return their results together.
-        """
-        try:
-            logger.info(
-                f"Starting bundled enhancement analysis for session_id={session_id}, filename={filename}"
-            )
-
-            technologies_task = self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                TechnologyDetection,
-                get_technology_detection_instructions(),
-            )
-            classification_task = self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                DiagramClassification,
-                get_diagram_classification_instructions(),
-            )
-            annotations_task = self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                Annotation,
-                get_annotation_extraction_instructions(),
-            )
-
-            (
-                technologies_json,
-                classification_json,
-                annotations_json,
-            ) = await asyncio.gather(
-                technologies_task, classification_task, annotations_task
-            )
-
-            bundled_result = {
-                "technologies": json.loads(technologies_json),
-                "diagram_classification": json.loads(classification_json),
-                "annotations": json.loads(annotations_json),
-                "technologies_json": technologies_json,
-                "classification_json": classification_json,
-                "annotations_json": annotations_json,
-            }
-
-            return json.dumps(bundled_result)
-
-        except Exception as e:
-            logger.error(f"Failed to run bundled enhancement analysis: {e}")
-            raise
-
     async def analyze_visual_components(
         self, user_id: str, session_id: str, filename: str
     ) -> str:
@@ -516,50 +453,6 @@ class VisionAnalysis:
 
         except Exception as e:
             logger.error(f"Failed to extract text: {e}")
-            raise
-
-    async def detect_technologies(
-        self, user_id: str, session_id: str, filename: str
-    ) -> str:
-        """Detect technologies, cloud services, frameworks from the image"""
-        try:
-            logger.info(
-                f"Starting technology detection for session_id={session_id}, filename={filename}"
-            )
-
-            result = await self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                TechnologyDetection,
-                get_technology_detection_instructions(),
-            )
-            return result
-
-        except Exception as e:
-            logger.error(f"Failed to detect technologies: {e}")
-            raise
-
-    async def classify_diagram_type(
-        self, user_id: str, session_id: str, filename: str
-    ) -> str:
-        """Classify the type, notation standard, and style of the diagram"""
-        try:
-            logger.info(
-                f"Starting diagram classification for session_id={session_id}, filename={filename}"
-            )
-
-            result = await self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                DiagramClassification,
-                get_diagram_classification_instructions(),
-            )
-            return result
-
-        except Exception as e:
-            logger.error(f"Failed to classify diagram: {e}")
             raise
 
     async def validate_visual_analysis(
@@ -653,92 +546,6 @@ Analyze these results and identify issues, inconsistencies, and areas for improv
             logger.error(f"Failed to validate analysis: {e}")
             raise
 
-    async def infer_relationships(
-        self,
-        user_id: str,
-        session_id: str,
-        filename: str,
-        components_json: str,
-        connections_json: str,
-    ) -> str:
-        """Infer logical relationships not explicitly shown visually"""
-        try:
-            logger.info(
-                f"Starting relationship inference for session_id={session_id}, filename={filename}"
-            )
-
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
-            inference_prompt = f"""Analyze the following components and connections for file "{filename}" and infer logical relationships.
-
-Components:
-{components_json}
-
-Connections:
-{connections_json}
-
-Infer relationships that are logically implied but not explicitly shown."""
-
-            llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini"))
-            llm_request = LlmRequest(
-                model=llm.model,
-                contents=[
-                    types.Content(
-                        role="user",
-                        parts=[
-                            types.Part.from_text(text=inference_prompt),
-                            part,
-                        ],
-                    )
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction=get_relationship_inference_instructions(),
-                    max_output_tokens=50000,
-                    response_mime_type="application/json",
-                ),
-            )
-
-            llm_request.set_output_schema(InferredRelationship)
-            response_text = ""
-            async for llm_response in llm.generate_content_async(
-                llm_request, stream=False
-            ):
-                if llm_response.content and llm_response.content.parts:
-                    text_parts = [
-                        part.text
-                        for part in llm_response.content.parts
-                        if hasattr(part, "text") and part.text
-                    ]
-                    if text_parts:
-                        response_text += "".join(text_parts)
-
-            if not response_text:
-                raise ValueError("Empty response from LLM")
-
-            try:
-                parsed_response = json.loads(response_text)
-                return json.dumps(parsed_response)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse inference response: {e}")
-                return json.dumps(
-                    {"raw_response": response_text, "parse_error": str(e)}
-                )
-
-        except Exception as e:
-            logger.error(f"Failed to infer relationships: {e}")
-            raise
-
     async def analyze_layout(self, user_id: str, session_id: str, filename: str) -> str:
         """Analyze diagram layout, hierarchy, and structure"""
         try:
@@ -804,7 +611,11 @@ Infer relationships that are logically implied but not explicitly shown."""
                 )
 
             result = await self._perform_visual_analysis(
-                part, filename, Annotation, get_annotation_extraction_instructions()
+                user_id,
+                session_id,
+                filename,
+                Annotation,
+                get_annotation_extraction_instructions()
             )
             return result
 
@@ -1112,12 +923,18 @@ Improve the analysis by correcting errors, filling gaps, and improving confidenc
                 logger.warning(
                     f"GPT extraction failed: {gpt4o_result}, using PaddleOCR only"
                 )
-                return paddleocr_result
+                if isinstance(paddleocr_result, str):
+                    return paddleocr_result
+                else:
+                    raise paddleocr_result
             elif isinstance(paddleocr_result, Exception):
                 logger.warning(
                     f"PaddleOCR extraction failed: {paddleocr_result}, using GPT only"
                 )
-                return gpt4o_result
+                if isinstance(gpt4o_result, str):
+                    return gpt4o_result
+                else:
+                    raise gpt4o_result
 
             # Parse results
             gpt4o_texts = (
@@ -1645,13 +1462,13 @@ Identify where lines cross and determine if they actually connect or just visual
             logger.error(f"Failed to detect line crossings: {e}")
             raise
 
-    async def detect_trust_boundaries(
-        self, user_id: str, session_id: str, filename: str, components_json: str = None
+    async def extract_boundaries(
+        self, user_id: str, session_id: str, filename: str, components_json: str | None = None
     ) -> str:
-        """Detect security and trust boundaries in architecture diagrams"""
+        """Extract visual boundaries and enclosures from diagrams"""
         try:
             logger.info(
-                f"Starting trust boundary detection for session_id={session_id}, filename={filename}"
+                f"Starting boundary extraction for session_id={session_id}, filename={filename}"
             )
 
             part = await self.artifact_service.load_artifact(
@@ -1669,16 +1486,16 @@ Identify where lines cross and determine if they actually connect or just visual
 
             # Optionally include components context if provided
             if components_json:
-                boundary_prompt = f"""Identify security and trust boundaries for file "{filename}".
+                boundary_prompt = f"""Extract visual boundaries and enclosures for file "{filename}".
 
 Known Components:
 {components_json}
 
-Identify all security zones, network boundaries, and trust perimeters."""
+Extract all visual boundaries, zones, and grouping regions."""
             else:
-                boundary_prompt = f"""Identify security and trust boundaries for file "{filename}".
+                boundary_prompt = f"""Extract visual boundaries and enclosures for file "{filename}".
 
-Analyze the diagram to find security zones, network boundaries, and trust perimeters."""
+Analyze the diagram to find all boundaries, zones, and grouping regions."""
 
             llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini"))
             llm_request = LlmRequest(
@@ -1693,13 +1510,13 @@ Analyze the diagram to find security zones, network boundaries, and trust perime
                     )
                 ],
                 config=types.GenerateContentConfig(
-                    system_instruction=get_trust_boundary_detection_instructions(),
+                    system_instruction=get_boundary_extraction_instructions(),
                     max_output_tokens=50000,
                     response_mime_type="application/json",
                 ),
             )
 
-            llm_request.set_output_schema(TrustBoundary)
+            llm_request.set_output_schema(VisualBoundary)
             response_text = ""
             async for llm_response in llm.generate_content_async(
                 llm_request, stream=False
@@ -1720,11 +1537,11 @@ Analyze the diagram to find security zones, network boundaries, and trust perime
                 parsed_response = json.loads(response_text)
                 return json.dumps(parsed_response)
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse trust boundary response: {e}")
+                logger.error(f"Failed to parse boundary response: {e}")
                 return json.dumps(
                     {"raw_response": response_text, "parse_error": str(e)}
                 )
 
         except Exception as e:
-            logger.error(f"Failed to detect trust boundaries: {e}")
+            logger.error(f"Failed to extract boundaries: {e}")
             raise

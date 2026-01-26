@@ -132,7 +132,7 @@ vision/
 
 ## API
 
-The agent exposes 21 tools via A2A protocol on port 8002.
+The agent exposes A2A tools on port 8002.
 
 ### Tool Categories
 
@@ -140,15 +140,13 @@ The agent exposes 21 tools via A2A protocol on port 8002.
 
 **OCR**: `extract_text_from_image`, `extract_text_with_paddleocr`, `extract_text_with_consensus`
 
-**Enhancement**: `detect_technologies`, `classify_diagram_type`, `extract_annotations`
-
-**Analysis**: `analyze_layout`, `analyze_styling`, `infer_relationships`
+**Analysis**: `analyze_layout`, `analyze_styling`
 
 **Quality**: `assess_image_quality`, `validate_visual_analysis`, `enhance_analysis`
 
-**Advanced**: `identify_regions`, `analyze_by_regions`,
+**Advanced**: `identify_regions`, `analyze_by_regions`
 
-**Export**: `export_to_plantuml`, `export_to_mermaid` , `export_to_drawio`
+**Export**: `export_to_plantuml`, `export_to_mermaid`, `export_to_drawio`
 
 **Comparison**: `compare_diagrams`
 
