@@ -132,8 +132,8 @@ class ValidationResult(BaseModel):
 
     is_valid: bool
     issues: List[ValidationIssue]
-    corrections: List[CorrectionSuggestion] = Field(default_factory=list)
-    suggestions: List[str] = Field(default_factory=list)
+    corrections: List[CorrectionSuggestion]
+    suggestions: List[str]
     quality_score: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Overall quality score (0.0-1.0)"
     )
@@ -218,10 +218,10 @@ class Annotation(BaseModel):
 class DiagramComparison(BaseModel):
     model_config = ConfigDict(extra="forbid", json_schema_extra={"additionalProperties": False})
 
-    added_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
-    removed_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
-    modified_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
-    unchanged_elements: List["DiagramChangeDetail"] = Field(default_factory=list)
+    added_elements: List["DiagramChangeDetail"]
+    removed_elements: List["DiagramChangeDetail"]
+    modified_elements: List["DiagramChangeDetail"]
+    unchanged_elements: List["DiagramChangeDetail"]
     similarity_score: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Overall similarity score (0.0-1.0)"
     )
@@ -233,11 +233,9 @@ class EnhancedAnalysis(BaseModel):
     original_analysis: str = Field(
         ..., description="Original analysis JSON serialized as a string"
     )
-    improvements: List["ImprovementDetail"] = Field(default_factory=list)
-    new_detections: List["DetectionDetail"] = Field(default_factory=list)
-    confidence_improvements: List["ConfidenceImprovementEntry"] = Field(
-        default_factory=list
-    )
+    improvements: List["ImprovementDetail"]
+    new_detections: List["DetectionDetail"]
+    confidence_improvements: List["ConfidenceImprovementEntry"]
     quality_score: confloat(ge=0.0, le=1.0) = Field(
         ..., description="Improved quality score (0.0-1.0)"
     )
@@ -284,7 +282,7 @@ class DrawIOExport(BaseModel):
     description: str
     diagram_type: Literal["architecture", "network", "flowchart", "infrastructure", "component", "other"]
     metadata: List[MetadataEntry] = Field(
-        default_factory=list,
+        ...,
         description="Additional metadata entries for the diagram",
     )
 
@@ -379,7 +377,7 @@ class LineCrossing(BaseModel):
         ..., description="True if lines actually connect, False if just visual crossing"
     )
     has_bridge_symbol: bool = Field(
-        default=False, description="Whether there's a bridge/tunnel symbol at crossing"
+        ..., description="Whether there's a bridge/tunnel symbol at crossing"
     )
     confidence: confloat(ge=0.0, le=1.0)
 
@@ -394,13 +392,13 @@ class TrustBoundary(BaseModel):
     ]
     position: Position
     components_inside: List[str] = Field(
-        default_factory=list, description="Components within this boundary"
+        ..., description="Components within this boundary"
     )
     security_level: Literal["public", "restricted", "confidential", "highly_confidential"] = Field(
-        default="restricted", description="Security classification"
+        ..., description="Security classification"
     )
     protection_mechanisms: List[str] = Field(
-        default_factory=list, description="Firewalls, WAF, etc. protecting this boundary"
+        ..., description="Firewalls, WAF, etc. protecting this boundary"
     )
     confidence: confloat(ge=0.0, le=1.0)
 

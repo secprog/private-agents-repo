@@ -155,7 +155,7 @@ class VulnerabilityAssessment(BaseModel):
         "insecure_configuration", "missing_security_control", "exposed_service",
         "insufficient_logging", "lack_of_segmentation", "other"
     ] = Field(..., description="Type of vulnerability")
-    cvss_score: confloat(ge=0.0, le=10.0) = Field(default=0.0, description="CVSS score if applicable")
+    cvss_score: confloat(ge=0.0, le=10.0) = Field(..., description="CVSS score if applicable")
     description: str = Field(..., description="Description of the vulnerability")
     remediation: str = Field(..., description="Recommended remediation steps")
     priority: Literal["critical", "high", "medium", "low"] = Field(..., description="Remediation priority")
@@ -167,7 +167,7 @@ class AttackPath(BaseModel):
     path_name: str = Field(..., description="Name of the attack path")
     entry_point: str = Field(..., description="Initial entry point component")
     target: str = Field(..., description="Final target component")
-    intermediate_components: List[str] = Field(default_factory=list, description="Components traversed")
+    intermediate_components: List[str] = Field(..., description="Components traversed")
     steps: List[str] = Field(..., description="Step-by-step attack progression")
     risk_level: Literal["critical", "high", "medium", "low"] = Field(..., description="Overall risk level")
     mitigation: str = Field(..., description="How to mitigate this attack path")
@@ -218,16 +218,16 @@ class ComprehensiveSecurityAnalysis(BaseModel):
     """Complete security analysis leveraging all vision data"""
     # Summary
     security_posture: SecurityPosture = Field(..., description="Overall security posture assessment")
-    
+
     # Detailed Analysis
-    threats: List[ThreatIdentification] = Field(default_factory=list, description="Identified threats")
-    vulnerabilities: List[VulnerabilityAssessment] = Field(default_factory=list, description="Vulnerability assessments")
-    attack_paths: List[AttackPath] = Field(default_factory=list, description="Potential attack paths")
-    
+    threats: List[ThreatIdentification] = Field(..., description="Identified threats")
+    vulnerabilities: List[VulnerabilityAssessment] = Field(..., description="Vulnerability assessments")
+    attack_paths: List[AttackPath] = Field(..., description="Potential attack paths")
+
     # Compliance & Recommendations
-    compliance_checks: List[ComplianceCheck] = Field(default_factory=list, description="Compliance assessments")
-    recommendations: List[SecurityRecommendation] = Field(default_factory=list, description="Security recommendations")
-    
+    compliance_checks: List[ComplianceCheck] = Field(..., description="Compliance assessments")
+    recommendations: List[SecurityRecommendation] = Field(..., description="Security recommendations")
+
     # Metadata
     analysis_summary: str = Field(..., description="Executive summary of findings")
     confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Overall confidence in analysis")
