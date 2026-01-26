@@ -147,7 +147,7 @@ class ValidationIssue(BaseModel):
     ]
     severity: Literal["error", "warning", "info"]
     description: str
-    affected_elements: List[str] = Field(default_factory=list)
+    affected_elements: List[str] = Field(...)
 
 
 class CorrectionSuggestion(BaseModel):
@@ -156,14 +156,14 @@ class CorrectionSuggestion(BaseModel):
     summary: str = Field(..., description="Short description of the correction")
     action: str = Field(..., description="Specific fix or change to apply")
     affected_elements: List[str] = Field(
-        default_factory=list,
+        ...,
         description="Components or connections impacted by this correction"
     )
     priority: Literal["high", "medium", "low"] = Field(
-        default="medium", description="Urgency/impact of applying the correction"
+        ..., description="Urgency/impact of applying the correction"
     )
     impact: str = Field(
-        default="", description="Expected improvement after applying the correction"
+        ..., description="Expected improvement after applying the correction"
     )
 
 
@@ -202,18 +202,18 @@ class LayoutGroup(BaseModel):
         "layer", "zone", "cluster", "swimlane", "boundary", "other"
     ] = Field(..., description="Kind of grouping represented")
     description: str = Field(
-        default="", description="Summary of what the group represents"
+        ..., description="Summary of what the group represents"
     )
     components: List[str] = Field(
-        default_factory=list,
+        ...,
         description="Components contained within this group",
     )
     position: Optional[Position] = Field(
-        default=None,
+        ...,
         description="Bounding box describing the group's visual region if available",
     )
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
-        default=0.0, description="Confidence score for the group identification"
+        ..., description="Confidence score for the group identification"
     )
 
 
@@ -223,11 +223,11 @@ class LayoutStructure(BaseModel):
     layout_type: Literal[
         "hierarchical", "layered", "circular", "grid", "freeform", "other"
     ]
-    layers: List[str] = Field(default_factory=list, description="Identified layers/tiers")
+    layers: List[str] = Field(..., description="Identified layers/tiers")
     groups: List[LayoutGroup] = Field(
-        default_factory=list, description="Visual groups identified"
+        ..., description="Visual groups identified"
     )
-    hierarchy_levels: int = Field(default=0, description="Number of hierarchy levels detected")
+    hierarchy_levels: int = Field(..., description="Number of hierarchy levels detected")
 
 
 class StylingPattern(BaseModel):
@@ -237,8 +237,8 @@ class StylingPattern(BaseModel):
         "color_coding", "shape_coding", "line_style", "size_coding", "other"
     ]
     description: str
-    elements: List[str] = Field(default_factory=list, description="Elements using this pattern")
-    meaning: str = Field(default="", description="Interpreted meaning of the pattern")
+    elements: List[str] = Field(..., description="Elements using this pattern")
+    meaning: str = Field(..., description="Interpreted meaning of the pattern")
 
 
 class Annotation(BaseModel):
@@ -249,7 +249,7 @@ class Annotation(BaseModel):
     annotation_type: Literal[
         "note", "warning", "callout", "comment", "label", "other"
     ]
-    associated_element: str = Field(default="", description="Component/connection this annotation refers to")
+    associated_element: str = Field(..., description="Component/connection this annotation refers to")
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
         ..., description="Confidence score for annotation extraction (0.0-1.0)"
     )
@@ -291,7 +291,7 @@ class OCRTextResult(BaseModel):
 
 class ConsensusTextResult(BaseModel):
     texts: List[OCRTextResult]
-    conflicts: List[Dict[str, Any]] = Field(default_factory=list)
+    conflicts: List[Dict[str, Any]] = Field(...)
     overall_confidence: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
@@ -334,13 +334,13 @@ class DiagramChangeDetail(BaseModel):
         ..., description="Identifier or label of the element that changed"
     )
     element_type: Literal["component", "connection", "zone", "other"] = Field(
-        default="component", description="Type of element that changed"
+        ..., description="Type of element that changed"
     )
     description: str = Field(
-        default="", description="Summary of what changed for this element"
+        ..., description="Summary of what changed for this element"
     )
     attributes: List[MetadataEntry] = Field(
-        default_factory=list,
+        ...,
         description="Additional structured details about the change",
     )
 
@@ -351,13 +351,13 @@ class ImprovementDetail(BaseModel):
     summary: str = Field(..., description="Short label for the improvement")
     action: str = Field(..., description="Specific fix or change performed")
     affected_elements: List[str] = Field(
-        default_factory=list, description="Elements impacted by this improvement"
+        ..., description="Elements impacted by this improvement"
     )
     impact: str = Field(
-        default="", description="Expected result or benefit of the improvement"
+        ..., description="Expected result or benefit of the improvement"
     )
     attributes: List[MetadataEntry] = Field(
-        default_factory=list,
+        ...,
         description="Optional structured metadata about the improvement",
     )
 
@@ -367,13 +367,13 @@ class DetectionDetail(BaseModel):
 
     name: str = Field(..., description="Identifier for the new detection")
     description: str = Field(
-        default="", description="Explanation of the detected element"
+        ..., description="Explanation of the detected element"
     )
     confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(
-        default=0.0, description="Confidence in this detection"
+        ..., description="Confidence in this detection"
     )
     attributes: List[MetadataEntry] = Field(
-        default_factory=list,
+        ...,
         description="Optional structured metadata about the detection",
     )
 
@@ -402,9 +402,9 @@ class LegendMapping(BaseModel):
 class LegendExtraction(BaseModel):
     model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
 
-    legend_title: str = Field(default="", description="Legend box title if present")
+    legend_title: str = Field(..., description="Legend box title if present")
     mappings: List[LegendMapping]
-    position: Optional[Position] = None
+    position: Optional[Position] = Field(...)
 
 
 class LineCrossing(BaseModel):
@@ -469,8 +469,8 @@ class ImageQualityAssessment(BaseModel):
     clarity: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Clarity score")
     brightness: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Brightness adequacy")
     contrast: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Contrast adequacy")
-    issues: List[str] = Field(default_factory=list, description="Quality issues detected")
-    recommendations: List[str] = Field(default_factory=list)
+    issues: List[str] = Field(..., description="Quality issues detected")
+    recommendations: List[str] = Field(...)
 
 
 class PreprocessingResult(BaseModel):
@@ -497,9 +497,9 @@ class RegionalAnalysis(BaseModel):
     model_config = ConfigDict(json_schema_extra={"additionalProperties": False})
 
     region: ImageRegion
-    components: List[VisualComponent] = Field(default_factory=list)
-    connections: List[VisualConnection] = Field(default_factory=list)
-    zones: List[VisualZone] = Field(default_factory=list)
+    components: List[VisualComponent] = Field(...)
+    connections: List[VisualConnection] = Field(...)
+    zones: List[VisualZone] = Field(...)
     quality_score: Annotated[float, Field(ge=0.0, le=1.0)]
 
 
@@ -520,8 +520,8 @@ class IterativeAnalysisResult(BaseModel):
     final_analysis: Dict[str, Any]
     iterations_completed: int
     quality_progression: List[float] = Field(
-        default_factory=list, description="Quality score at each iteration"
+        ..., description="Quality score at each iteration"
     )
-    improvements_made: List[str] = Field(default_factory=list)
+    improvements_made: List[str] = Field(...)
     final_quality_score: Annotated[float, Field(ge=0.0, le=1.0)]
 
