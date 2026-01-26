@@ -81,7 +81,6 @@ ADDITIONAL TOOLS (use as needed):
 - extract_legend_mappings - Extract legend symbols and meanings
 - detect_line_crossings - Analyze line topology (advanced)
 - identify_regions - Segment complex diagrams (advanced)
-- compare_diagrams - Compare two diagrams (requires 2 files)
 
 CRITICAL RULES:
 1. Extract COMPLETE visual details: colors, shapes, text, icons, badges, markers, line styles
@@ -116,8 +115,6 @@ IMPORTANT:
         FunctionTool(func=vision_analysis.extract_legend_mappings),
         FunctionTool(func=vision_analysis.detect_line_crossings),
         FunctionTool(func=vision_analysis.identify_regions),
-        # Comparison
-        FunctionTool(func=vision_analysis.compare_diagrams),
     ],
     planner=BuiltInPlanner(thinking_config=thinking_config),
 )

@@ -4,42 +4,25 @@ Advanced visual analysis agent for architecture diagrams and images using GPT Vi
 
 ## Features
 
-### Core Analysis (3 tools)
-- **Visual Components** - Extract components (nodes, boxes, icons, etc.)
-- **Visual Connections** - Extract connections (arrows, lines, etc.)
-- **Visual Zones** - Extract zones (regions, boundaries, etc.)
+### Core Extraction
+- **run_core_analysis_parallel** – Single call that extracts components, connections, and zones
 
-### OCR & Text Extraction (3 tools)
-- **GPT OCR** - Standard text extraction
-- **PaddleOCR** - High-accuracy dedicated OCR (fallback to GPT)
-- **Consensus Extraction** - Combines both for best results
+### OCR
+- **extract_text_from_image** – Pull all visible text from the image
 
-### Enhancement Tools (3 tools)
-- **Technology Detection** - Identify cloud services, frameworks, tools
-- **Diagram Classification** - Classify diagram type and notation
-- **Annotation Extraction** - Extract notes, callouts, warnings
+### Analysis
+- **analyze_layout** – Describe structure and hierarchy
+- **analyze_styling** – Capture color, line, and visual conventions
+- **validate_visual_analysis** – Sanity-check prior extraction
 
-### Analysis Tools (3 tools)
-- **Layout Analysis** - Analyze structure and hierarchy
-- **Styling Analysis** - Analyze color coding and conventions
-- **Relationship Inference** - Infer logical relationships
+### Annotations & Boundaries
+- **extract_annotations** – Notes, callouts, warnings
+- **extract_boundaries** – Visual boundaries/enclosures
 
-### Quality Tools (3 tools)
-- **Quality Assessment** - Evaluate image quality
-- **Validation** - Check analysis quality and consistency
-- **Enhancement** - Improve analysis iteratively
-
-### Advanced Analysis (3 tools)
-- **Region Identification** - Identify logical regions
-- **Region-based Analysis** - Detailed analysis per region
-- **Iterative Analysis** - Auto-improve with quality threshold
-
-### Export Tools (2 tools)
-- **PlantUML Export** - Generate PlantUML code
-- **Mermaid Export** - Generate Mermaid diagram code
-
-### Comparison (1 tool)
-- **Diagram Comparison** - Compare two diagrams
+### Advanced Visual
+- **identify_regions** – Segment complex diagrams
+- **extract_legend_mappings** – Map legend symbols to meanings
+- **detect_line_crossings** – Flag crossing lines and whether they connect
 
 ## Installation
 
@@ -87,23 +70,6 @@ python vision_agent.py
 }
 ```
 
-### Export to PlantUML
-
-```python
-# First analyze, then export
-# 1. Run analysis to get components, connections, zones
-# 2. Export to PlantUML
-{
-  "tool": "export_to_plantuml",
-  "user_id": "user123",
-  "session_id": "session456",
-  "filename": "diagram.png",
-  "components_json": "...",
-  "connections_json": "...",
-  "zones_json": "..."
-}
-```
-
 ## Configuration
 
 See `.env.example` for all configuration options.
@@ -136,19 +102,17 @@ The agent exposes A2A tools on port 8002.
 
 ### Tool Categories
 
-**Core**: `analyze_visual_components`, `analyze_visual_connections`, `analyze_visual_zones`
+**Core**: `run_core_analysis_parallel` (components, connections, zones)
 
-**OCR**: `extract_text_from_image`, `extract_text_with_paddleocr`, `extract_text_with_consensus`
+**OCR**: `extract_text_from_image`
 
-**Analysis**: `analyze_layout`, `analyze_styling`
+**Analysis**: `analyze_layout`, `analyze_styling`, `validate_visual_analysis`
 
-**Quality**: `assess_image_quality`, `validate_visual_analysis`, `enhance_analysis`
+**Annotations**: `extract_annotations`
 
-**Advanced**: `identify_regions`, `analyze_by_regions`
+**Boundaries**: `extract_boundaries`
 
-**Export**: `export_to_plantuml`, `export_to_mermaid`, `export_to_drawio`
-
-**Comparison**: `compare_diagrams`
+**Advanced**: `identify_regions`, `extract_legend_mappings`, `detect_line_crossings`
 
 ## Development
 
