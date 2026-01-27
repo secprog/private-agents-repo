@@ -70,9 +70,11 @@ Extract colors, shapes, text, positions, visual markers objectively.
 Downstream agents will interpret the visual facts you provide for their specific domains.
 
 WORKFLOW:
-1. run_core_analysis_parallel - Extract components, connections, zones (ALWAYS START HERE)
-2. extract_boundaries - Extract visual boundaries and enclosures
-3. extract_annotations - Extract text annotations, notes, callouts
+1. analyze_visual_components - Extract components (nodes, boxes, icons)
+2. analyze_visual_connections - Extract connections (arrows, lines)
+3. analyze_visual_zones - Extract zones/regions
+4. extract_boundaries - Extract visual boundaries and enclosures
+5. extract_annotations - Extract text annotations, notes, callouts
 
 ADDITIONAL TOOLS (use as needed):
 - extract_text_from_image - Extract all text if core analysis missed text
@@ -90,7 +92,7 @@ CRITICAL RULES:
 
 WORKFLOW EXAMPLE:
 User: "Analyze this architecture diagram"
-1. Call run_core_analysis_parallel → get components, connections, zones with ALL visual details
+1. Call analyze_visual_components / analyze_visual_connections / analyze_visual_zones → get core visual facts
 2. Call extract_boundaries → get visual boundaries
 3. Call extract_annotations → get text annotations, notes, callouts
 4. Return all extracted visual data
@@ -103,7 +105,9 @@ IMPORTANT:
 """,
     tools=[
         # Core extraction
-        FunctionTool(func=vision_analysis.run_core_analysis_parallel),
+        FunctionTool(func=vision_analysis.analyze_visual_components),
+        FunctionTool(func=vision_analysis.analyze_visual_connections),
+        FunctionTool(func=vision_analysis.analyze_visual_zones),
         FunctionTool(func=vision_analysis.extract_boundaries),
         FunctionTool(func=vision_analysis.extract_annotations),
         # Text extraction

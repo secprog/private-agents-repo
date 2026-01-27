@@ -16,14 +16,12 @@ from google.adk.models.llm_request import LlmRequest
 from google.genai import types
 from google.genai.types import Part
 from pydantic import BaseModel
-import os
 
 from prompts import (
     get_component_analysis_instructions,
     get_connection_analysis_instructions,
     get_zone_analysis_instructions,
     get_text_extraction_instructions,
-    get_validation_instructions,
     get_layout_analysis_instructions,
     get_styling_analysis_instructions,
     get_annotation_extraction_instructions,
@@ -37,14 +35,12 @@ from models import (
     VisualConnection,
     VisualZone,
     TextExtraction,
-    ValidationResult,
     LayoutStructure,
     StylingPattern,
     Annotation,
     ImageRegion,
     LegendExtraction,
     LineCrossing,
-    OCRTextResult,
     Position,
     VisualBoundary,
 )
@@ -299,59 +295,6 @@ class VisionAnalysis:
             # Return as a JSON string containing the raw text
             return json.dumps({"raw_response": response_text, "parse_error": str(e)})
 
-    async def run_core_analysis_parallel(
-        self, user_id: str, session_id: str, filename: str
-    ) -> str:
-        """
-        Run the components, connections, and zones analysis passes in parallel
-        and return all results in a single JSON payload.
-        """
-        try:
-            logger.info(
-                f"Starting bundled core analysis for session_id={session_id}, filename={filename}"
-            )
-
-            components_task = self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                VisualComponent,
-                get_component_analysis_instructions(),
-            )
-            connections_task = self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                VisualConnection,
-                get_connection_analysis_instructions(),
-            )
-            zones_task = self._perform_visual_analysis(
-                user_id,
-                session_id,
-                filename,
-                VisualZone,
-                get_zone_analysis_instructions(),
-            )
-
-            components_json, connections_json, zones_json = await asyncio.gather(
-                components_task, connections_task, zones_task
-            )
-
-            bundled_result = {
-                "components": json.loads(components_json),
-                "connections": json.loads(connections_json),
-                "zones": json.loads(zones_json),
-                "components_json": components_json,
-                "connections_json": connections_json,
-                "zones_json": zones_json,
-            }
-
-            return json.dumps(bundled_result)
-
-        except Exception as e:
-            logger.error(f"Failed to run bundled core analysis: {e}")
-            raise
-
     async def analyze_visual_components(
         self, user_id: str, session_id: str, filename: str
     ) -> str:
@@ -441,97 +384,6 @@ class VisionAnalysis:
 
         except Exception as e:
             logger.error(f"Failed to extract text: {e}")
-            raise
-
-    async def validate_visual_analysis(
-        self,
-        user_id: str,
-        session_id: str,
-        filename: str,
-        components_json: str,
-        connections_json: str,
-        zones_json: str,
-    ) -> str:
-        """Validate and check quality of visual analysis results"""
-        try:
-            logger.info(
-                f"Starting validation for session_id={session_id}, filename={filename}"
-            )
-
-            part = await self.artifact_service.load_artifact(
-                app_name=APP_NAME,
-                user_id=user_id,
-                session_id=session_id,
-                filename=filename,
-                version=None,
-            )
-
-            if not part or not part.inline_data:
-                raise ValueError(
-                    f"Could not load artifact: {filename} from session {session_id}"
-                )
-
-            # Create prompt with analysis results
-            validation_prompt = f"""Validate the following visual analysis results for file "{filename}".
-
-Components:
-{components_json}
-
-Connections:
-{connections_json}
-
-Zones:
-{zones_json}
-
-Analyze these results and identify issues, inconsistencies, and areas for improvement."""
-
-            llm = LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini"))
-            llm_request = LlmRequest(
-                model=llm.model,
-                contents=[
-                    types.Content(
-                        role="user",
-                        parts=[
-                            types.Part.from_text(text=validation_prompt),
-                            part,
-                        ],
-                    )
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction=get_validation_instructions(),
-                    max_output_tokens=50000,
-                    response_mime_type="application/json",
-                ),
-            )
-
-            llm_request.set_output_schema(ValidationResult)
-            response_text = ""
-            async for llm_response in llm.generate_content_async(
-                llm_request, stream=False
-            ):
-                if llm_response.content and llm_response.content.parts:
-                    text_parts = [
-                        part.text
-                        for part in llm_response.content.parts
-                        if hasattr(part, "text") and part.text
-                    ]
-                    if text_parts:
-                        response_text += "".join(text_parts)
-
-            if not response_text:
-                raise ValueError("Empty response from LLM")
-
-            try:
-                parsed_response = json.loads(response_text)
-                return json.dumps(parsed_response)
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse validation response: {e}")
-                return json.dumps(
-                    {"raw_response": response_text, "parse_error": str(e)}
-                )
-
-        except Exception as e:
-            logger.error(f"Failed to validate analysis: {e}")
             raise
 
     async def analyze_layout(self, user_id: str, session_id: str, filename: str) -> str:
