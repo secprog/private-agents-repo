@@ -5,7 +5,9 @@ Advanced visual analysis agent for architecture diagrams and images using GPT Vi
 ## Features
 
 ### Core Extraction
-- **run_core_analysis_parallel** – Single call that extracts components, connections, and zones
+- **analyze_visual_components** – Extract components (nodes, icons, boxes)
+- **analyze_visual_connections** – Extract connections (arrows, lines, link styling)
+- **analyze_visual_zones** – Extract zones/regions and their positioning
 
 ### OCR
 - **extract_text_from_image** – Pull all visible text from the image
@@ -102,7 +104,7 @@ The agent exposes A2A tools on port 8002.
 
 ### Tool Categories
 
-**Core**: `run_core_analysis_parallel` (components, connections, zones)
+**Core**: `analyze_visual_components`, `analyze_visual_connections`, `analyze_visual_zones`
 
 **OCR**: `extract_text_from_image`
 

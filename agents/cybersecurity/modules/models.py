@@ -1,64 +1,60 @@
-from typing import List, Literal
+from typing import Annotated, List, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, confloat
-
-# Pydantic models for Security Analysis
-class ComponentSecurity(BaseModel):
-    component_name: str
-    component_type: Literal[
-        "database",
-        "application",
-        "gateway",
-        "cloud_service",
-        "load_balancer",
-        "firewall",
-        "proxy",
-        "cache",
-        "queue",
-        "storage",
-        "compute",
-        "network",
-        "monitoring",
-        "other",
-    ]
-    security_domain: Literal["Internet", "Intranet", "DMZ", "Cloud", "Unknown"]
-    technology: str
-    exposure_level: Literal["High", "Medium", "Low"]
-    security_concerns: List[str]
-    confidence: confloat(ge=0.0, le=1.0) = Field(
-        ..., description="Confidence score for security assessment (0.0-1.0)"
-    )
+from pydantic import BaseModel, Field
 
 
-class ConnectionSecurity(BaseModel):
-    source: str
-    target: str
-    protocol: str
-    security_level: Literal["Secure", "Insecure", "Unknown"]
-    encryption: Literal["Encrypted", "Unencrypted", "Unknown"]
-    security_concerns: List[str]
-    confidence: confloat(ge=0.0, le=1.0) = Field(
-        ...,
-        description="Confidence score for connection security assessment (0.0-1.0)",
-    )
+# Security Context - first pass interpretation of generic visual data
+class IdentifiedComponent(BaseModel):
+    """A visual component interpreted for its IT/security role"""
+    visual_name: str = Field(..., description="Original component name from vision data")
+    inferred_role: Literal[
+        "database", "application", "gateway", "cloud_service", "load_balancer",
+        "firewall", "waf", "proxy", "cache", "queue", "storage", "compute",
+        "network", "monitoring", "cdn", "dns", "identity_provider",
+        "container_orchestrator", "serverless", "api", "frontend", "backend",
+        "message_broker", "secret_manager", "logging", "user", "external_service", "other"
+    ] = Field(..., description="Inferred IT role based on text_content, all_text_labels, visual_badges, visual_type")
+    technology: str = Field(..., description="Identified technology (e.g., 'PostgreSQL 14', 'AWS Lambda', 'Nginx')")
+    exposure_level: Literal["internet_facing", "dmz", "internal", "isolated", "unknown"] = Field(..., description="Inferred exposure level")
+    security_controls_present: List[str] = Field(..., description="Security controls identified from visual badges/labels (e.g., 'encryption', 'authentication', 'WAF')")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Confidence in interpretation")]
 
 
-class SecurityZone(BaseModel):
-    zone_name: str
-    security_level: Literal["High", "Medium", "Low"]
-    components: List[str]
-    boundary_controls: List[str]
+class IdentifiedConnection(BaseModel):
+    """A visual connection interpreted for its security properties"""
+    source: str = Field(..., description="Source component name")
+    target: str = Field(..., description="Target component name")
+    inferred_protocol: str = Field(..., description="Inferred protocol from labels (e.g., 'HTTPS', 'gRPC', 'SQL', 'unknown')")
+    encryption_status: Literal["encrypted", "unencrypted", "unknown"] = Field(..., description="Inferred encryption status")
+    crosses_trust_boundary: bool = Field(..., description="Whether this connection crosses a security zone boundary")
+    security_concerns: List[str] = Field(..., description="Any security concerns about this connection")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Confidence in interpretation")
 
 
-class SecurityAnalysisResponse(BaseModel):
-    component_security: List[ComponentSecurity]
-    connection_security: List[ConnectionSecurity]
-    security_zones: List[SecurityZone]
-    security_concerns: List[str]
-    recommendations: List[str]
+class IdentifiedSecurityZone(BaseModel):
+    """A visual boundary interpreted as a security zone"""
+    boundary_name: str = Field(..., description="Original boundary name from vision data")
+    inferred_zone_type: Literal[
+        "internet", "dmz", "public_subnet", "private_subnet", "vpc",
+        "internal_network", "management_zone", "data_zone", "isolated_segment", "other"
+    ] = Field(..., description="Inferred security zone type from text_labels, colors, styles")
+    security_level: Literal["critical", "high", "medium", "low"] = Field(..., description="Inferred security level")
+    components_inside: List[str] = Field(..., description="Components within this zone")
+    boundary_controls: List[str] = Field(..., description="Security controls at the boundary (inferred from visual data)")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Confidence in interpretation")
 
 
-# NEW: Comprehensive Security Analysis Models
+class SecurityContext(BaseModel):
+    """First-pass interpretation of generic visual data into security context"""
+    components: List[IdentifiedComponent] = Field(..., description="Components with inferred IT roles and technologies")
+    connections: List[IdentifiedConnection] = Field(..., description="Connections with inferred protocols and encryption")
+    security_zones: List[IdentifiedSecurityZone] = Field(..., description="Boundaries interpreted as security zones")
+    diagram_type: str = Field(..., description="Inferred diagram type (e.g., 'cloud architecture', 'network topology', 'microservices', 'data flow')")
+    overall_notes: List[str] = Field(..., description="General observations about the architecture's security posture")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Overall confidence in security context interpretation")]
+
+
+# Detailed Security Analysis Models
 class ThreatIdentification(BaseModel):
     threat_id: str = Field(..., description="Unique identifier for the threat")
     threat_name: str = Field(..., description="Name of the threat (e.g., 'Unauthorized Database Access')")
@@ -73,7 +69,7 @@ class ThreatIdentification(BaseModel):
     description: str = Field(..., description="Detailed description of the threat")
     attack_vector: str = Field(..., description="How the attack could be carried out")
     impact: str = Field(..., description="Potential impact if exploited")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Confidence in threat identification")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Confidence in threat identification")]
 
 
 class VulnerabilityAssessment(BaseModel):
@@ -85,11 +81,11 @@ class VulnerabilityAssessment(BaseModel):
         "insecure_configuration", "missing_security_control", "exposed_service",
         "insufficient_logging", "lack_of_segmentation", "other"
     ] = Field(..., description="Type of vulnerability")
-    cvss_score: confloat(ge=0.0, le=10.0) = Field(..., description="CVSS score if applicable")
+    cvss_score: Annotated[float, Field(ge=0.0, le=10.0, description="CVSS score if applicable")]
     description: str = Field(..., description="Description of the vulnerability")
     remediation: str = Field(..., description="Recommended remediation steps")
     priority: Literal["critical", "high", "medium", "low"] = Field(..., description="Remediation priority")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Confidence in assessment")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Confidence in assessment")]
 
 
 class AttackPath(BaseModel):
@@ -101,7 +97,7 @@ class AttackPath(BaseModel):
     steps: List[str] = Field(..., description="Step-by-step attack progression")
     risk_level: Literal["critical", "high", "medium", "low"] = Field(..., description="Overall risk level")
     mitigation: str = Field(..., description="How to mitigate this attack path")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Confidence in path analysis")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Confidence in path analysis")]
 
 
 class ComplianceCheck(BaseModel):
@@ -115,7 +111,7 @@ class ComplianceCheck(BaseModel):
     affected_components: List[str] = Field(..., description="Components related to this requirement")
     finding: str = Field(..., description="Detailed finding")
     recommendation: str = Field(..., description="Recommendation for compliance")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Confidence in assessment")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0)] = Field(..., description="Confidence in assessment")
 
 
 class SecurityRecommendation(BaseModel):
@@ -132,11 +128,11 @@ class SecurityRecommendation(BaseModel):
     implementation_steps: List[str] = Field(..., description="Steps to implement")
     estimated_effort: Literal["low", "medium", "high", "very_high"] = Field(..., description="Implementation effort")
     expected_impact: str = Field(..., description="Expected security improvement")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Confidence in recommendation")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Confidence in recommendation")]
 
 
 class SecurityPosture(BaseModel):
-    overall_score: confloat(ge=0.0, le=100.0) = Field(..., description="Overall security score (0-100)")
+    overall_score: Annotated[float, Field(ge=0.0, le=100.0, description="Overall security score (0-100)")]
     maturity_level: Literal["initial", "developing", "defined", "managed", "optimizing"] = Field(..., description="Security maturity level")
     strengths: List[str] = Field(..., description="Identified security strengths")
     weaknesses: List[str] = Field(..., description="Identified security weaknesses")
@@ -144,20 +140,26 @@ class SecurityPosture(BaseModel):
     quick_wins: List[str] = Field(..., description="Easy improvements with high impact")
 
 
-class ComprehensiveSecurityAnalysis(BaseModel):
-    """Complete security analysis leveraging all vision data"""
-    # Summary
-    security_posture: SecurityPosture = Field(..., description="Overall security posture assessment")
-
-    # Detailed Analysis
+# Phase output wrapper models (for LLM output schema enforcement)
+class ThreatAnalysisResult(BaseModel):
+    """Output of Phase 2: threat and vulnerability analysis"""
     threats: List[ThreatIdentification] = Field(..., description="Identified threats")
     vulnerabilities: List[VulnerabilityAssessment] = Field(..., description="Vulnerability assessments")
+
+
+class AttackPathResult(BaseModel):
+    """Output of Phase 3: attack path analysis"""
     attack_paths: List[AttackPath] = Field(..., description="Potential attack paths")
 
-    # Compliance & Recommendations
-    compliance_checks: List[ComplianceCheck] = Field(..., description="Compliance assessments")
-    recommendations: List[SecurityRecommendation] = Field(..., description="Security recommendations")
 
-    # Metadata
+class ComplianceResult(BaseModel):
+    """Output of Phase 4: compliance assessment"""
+    compliance_checks: List[ComplianceCheck] = Field(..., description="Compliance assessments")
+
+
+class RecommendationsResult(BaseModel):
+    """Output of Phase 5: recommendations and posture"""
+    security_posture: SecurityPosture = Field(..., description="Overall security posture assessment")
+    recommendations: List[SecurityRecommendation] = Field(..., description="Security recommendations")
     analysis_summary: str = Field(..., description="Executive summary of findings")
-    confidence: confloat(ge=0.0, le=1.0) = Field(..., description="Overall confidence in analysis")
+    confidence: Annotated[float, Field(ge=0.0, le=1.0, description="Overall confidence in analysis")]

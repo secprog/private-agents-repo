@@ -54,19 +54,29 @@ rag_analysis = RAGAnalysis()
 rag_analyzer_agent = Agent(
     name="rag_analyzer",
     description="Specialized agent for retrieval-augmented generation and document search",
-    model=LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini")),
+    model=LiteLlm(os.getenv("LLM_MODEL", "openai/gpt-5-mini")),
     instruction="""You are an advanced RAG (Retrieval-Augmented Generation) agent specialized in document retrieval and knowledge extraction.
 
 You have access to the following tools:
 
 SEARCH TOOLS:
-1. vector_search - Search for documents using semantic similarity
-2. graph_search - Search structured data using graph queries
-3. detect_entities - Extract named entities from text
+1. vector_search - Semantic similarity search using embeddings
+2. lexical_search - Full-text keyword search (supports Lucene syntax)
+3. graph_search - Convert natural language to Cypher and query the graph
+4. detect_entities - Extract named entities from text
 
 RETRIEVAL TOOLS:
-4. hybrid_search - Combine vector and lexical search for better results
-5. graph_based_retrieval - Retrieve documents based on entity relationships
+5. graph_based_retrieval - Retrieve documents based on entity relationships in the graph
+
+QUERY TOOLS:
+6. query_expand - Expand query with synonyms, related terms, and alternate phrasings
+
+RERANKING TOOLS:
+7. bm25_rerank - Re-rank using BM25 (fast, keyword-based)
+8. cross_encoder_rerank - Re-rank using LLM scoring (slower, more accurate)
+
+FUSION TOOLS:
+9. reciprocal_rank_fusion - Fuse multiple ranked lists with configurable weights
 
 Use these tools to:
 - Answer questions based on retrieved documents
@@ -74,23 +84,42 @@ Use these tools to:
 - Find semantically similar content
 - Identify entities and relationships
 
-When the user asks a question:
-1. First, use detect_entities to extract key entities from the question
-2. Use hybrid_search or vector_search to find relevant documents
-3. If needed, use graph_based_retrieval to find related information
-4. Synthesize the information to provide a comprehensive answer
+WORKFLOW for answering questions:
+1. Use query_expand to generate synonyms and related terms (optional but improves recall)
+2. Use detect_entities to extract key entities from the question
+3. Run multiple searches in parallel for best coverage:
+   - vector_search for semantic similarity (use expanded query if available)
+   - lexical_search for exact keyword matches
+   - graph_based_retrieval if entities were found
+4. Use reciprocal_rank_fusion to combine results:
+   Example: {"vector": [...], "lexical": [...], "entity": [...]}
+   With weights: {"vector": 1.2, "lexical": 1.0, "entity": 0.8}
+5. Synthesize the fused results to provide a comprehensive answer
+
+ADVANCED RERANKING:
+- bm25_rerank: Fast keyword-based reranking, good for large result sets
+- cross_encoder_rerank: LLM-based scoring, more accurate but slower (use for top ~20 docs)
 
 IMPORTANT:
 - Always cite your sources when providing information
 - If information is not found, clearly state that
-- Prefer hybrid_search over simple vector_search for better results
+- Use query_expand for complex or ambiguous queries to improve recall
+- Use vector_search alone for simple semantic queries
+- Use lexical_search alone when exact keywords matter
+- Use bm25_rerank for fast keyword-based reranking (100s of docs)
+- Use cross_encoder_rerank for accurate semantic reranking (top 10-20 docs)
+- Combine sources with reciprocal_rank_fusion for best results
 """,
     tools=[
         LongRunningFunctionTool(func=rag_analysis.vector_search),
+        LongRunningFunctionTool(func=rag_analysis.lexical_search),
         LongRunningFunctionTool(func=rag_analysis.graph_search),
         LongRunningFunctionTool(func=rag_analysis.detect_entities),
-        LongRunningFunctionTool(func=rag_analysis.hybrid_search),
         LongRunningFunctionTool(func=rag_analysis.graph_based_retrieval),
+        LongRunningFunctionTool(func=rag_analysis.query_expand),
+        LongRunningFunctionTool(func=rag_analysis.bm25_rerank),
+        LongRunningFunctionTool(func=rag_analysis.cross_encoder_rerank),
+        LongRunningFunctionTool(func=rag_analysis.reciprocal_rank_fusion),
     ],
     planner=BuiltInPlanner(thinking_config=thinking_config),
 )
@@ -99,7 +128,7 @@ IMPORTANT:
 root_agent = Agent(
     name=agent_identifier,
     description="Specialized agent for retrieval-augmented generation and knowledge extraction from documents.",
-    model=LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5-mini")),
+    model=LiteLlm(os.getenv("LLM_MODEL", "openai/gpt-5-mini")),
     instruction="""You are a RAG agent coordinator. Delegate all retrieval and search tasks to the rag_analyzer sub-agent.
 
 Workflow:

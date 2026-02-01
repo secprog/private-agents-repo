@@ -1,5 +1,5 @@
 ﻿"""
-Vision Analysis Module - Specialized visual analysis for architecture diagrams
+Vision Analysis Module - Specialized visual analysis for diagrams and images
 """
 
 import logging
@@ -95,7 +95,7 @@ class VisionAnalysis:
                     "message": "Please upload/select an image before requesting visual analysis.",
                 }
             )
-        visual_prompt = f"""Analyze this architecture diagram with advanced computer vision capabilities. 
+        visual_prompt = f"""Analyze this diagram/image with advanced computer vision capabilities.
         For the file "{filename}", provide a comprehensive visual analysis in json format."""
 
         part = await self.artifact_service.load_artifact(

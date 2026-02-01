@@ -17,10 +17,9 @@ class VisualComponent(BaseModel):
 
     name: str
     component_type: Literal[
-        "application", "service", "database", "cache", "queue",
-        "api_gateway", "load_balancer", "storage", "network",
-        "security", "monitoring", "user", "external_service", "other"
-    ] = Field(..., description="Semantic role/type of the component")
+        "icon", "labeled_box", "container", "shape",
+        "image", "text_block", "badge", "indicator", "actor", "other"
+    ] = Field(..., description="Visual category of the component as it appears in the diagram")
     visual_type: Literal[
         "box", "circle", "icon", "diamond", "cylinder", "cloud", "other"
     ]
@@ -152,7 +151,7 @@ class StylingPattern(BaseModel):
     ]
     description: str
     elements: List[str] = Field(..., description="Elements using this pattern")
-    meaning: str = Field(..., description="Interpreted meaning of the pattern")
+    visual_observation: str = Field(..., description="What this pattern looks like visually (e.g., 'all red boxes are grouped together', 'dashed lines connect to elements outside the boundary')")
 
 
 class Annotation(BaseModel):

@@ -9,24 +9,21 @@ For EACH component, extract complete visual information:
 
 name:
 A short, human-readable identifier from text near or inside the component.
-Examples: "User Service", "Postgres DB", "API Gateway", "Load Balancer"
+Use the EXACT text visible on the component. If no text, describe what you see.
+Examples: "Amazon CloudFront", "PostgreSQL", "Step 3", "Mix ingredients", "Color palette"
 
 component_type:
-Semantic role/type of the component:
-- "application" - Applications, services, APIs, microservices
-- "service" - Backend services, workers, processors
-- "database" - Databases, data stores
-- "cache" - Cache layers (Redis, Memcached)
-- "queue" - Message queues, event streams
-- "api_gateway" - API gateways, reverse proxies
-- "load_balancer" - Load balancers, traffic managers
-- "storage" - File storage, object storage, blob storage
-- "network" - Network devices, routers, switches
-- "security" - Security devices, firewalls, WAFs
-- "monitoring" - Monitoring, logging, observability
-- "user" - Users, clients, actors
-- "external_service" - Third-party services, external APIs
-- "other" - Anything else
+Visual category describing how the component APPEARS in the diagram (NOT what it represents):
+- "icon" - A recognizable logo, pictogram, or standalone icon (brand logo, person silhouette, symbol)
+- "labeled_box" - A rectangle or rounded rectangle with text inside
+- "container" - A large box/region that visually contains other components inside it
+- "shape" - A geometric shape (cylinder, diamond, hexagon, triangle, etc.)
+- "image" - A photo, screenshot, illustration, or embedded image
+- "text_block" - A standalone block of text without a clear border/shape
+- "badge" - A small visual element like a status dot, number badge, or tag
+- "indicator" - A visual indicator like a gauge, progress bar, traffic light, or meter
+- "actor" - A stick figure, person icon, or user representation
+- "other" - Anything that doesn't fit the above categories
 
 visual_type:
 Shape/style of the component:
@@ -34,7 +31,7 @@ Shape/style of the component:
 - "circle" - Circles, ellipses, ovals
 - "icon" - Logos or icons without geometric container
 - "diamond" - Diamond/rhombus shapes
-- "cylinder" - Database cylinder shape
+- "cylinder" - Cylinder or barrel shape
 - "cloud" - Cloud-shaped components
 - "other" - Any other shape
 
@@ -46,8 +43,8 @@ ALL text INSIDE the component box/shape, exactly as shown.
 Include every line of text within the component boundary.
 
 visual_group:
-Name of the logical group or container this component belongs to.
-Examples: "VPC A", "Frontend", "Backend", "Internal Network", "DMZ", "Europe Region"
+Name of the visual group or container this component belongs to (use the text label on the container).
+Examples: "Group A", "Phase 1", "Left Section", "Top Region", "Blue Area"
 If no visible group, use empty string "".
 
 primary_color:
@@ -88,37 +85,38 @@ IMPORTANT INSTRUCTIONS:
 2. Do NOT include arrows, lines, or connectors as components
 3. Capture EVERY visual detail - colors, icons, symbols, text
 4. Be specific with colors and visual markers
-5. If role/type is unclear, pick closest type and lower confidence
+5. If visual category is unclear, pick closest type and lower confidence
+6. Do NOT interpret what a component represents - only describe what you SEE
 
 Return ONLY valid JSON: a top-level array of VisualComponent objects with no extra commentary.
 
 Example structure:
 [
   {
-    "name": "User Service",
-    "component_type": "application",
+    "name": "Step 2",
+    "component_type": "labeled_box",
     "visual_type": "box",
-    "position": {"x": 120, "y": 200, "width": 260, "height": 100},
-    "text_content": "User Service\\nNode.js",
-    "visual_group": "Backend",
+    "position": {"x": 120, "y": 200, "width": 180, "height": 80},
+    "text_content": "Step 2\\nProcess Data",
+    "visual_group": "Phase A",
     "primary_color": "blue",
     "border_style": "solid",
-    "visual_badges": ["lock icon", "cloud logo"],
-    "all_text_labels": ["Port 3000", "REST API"],
+    "visual_badges": ["gear icon"],
+    "all_text_labels": ["Required", "v2.1"],
     "size_category": "medium",
     "confidence": 0.94
   },
   {
-    "name": "Postgres DB",
-    "component_type": "database",
+    "name": "Storage",
+    "component_type": "shape",
     "visual_type": "cylinder",
     "position": {"x": 450, "y": 210, "width": 140, "height": 120},
-    "text_content": "PostgreSQL\\n14.2",
-    "visual_group": "Backend",
+    "text_content": "Storage\\nMain",
+    "visual_group": "Bottom Row",
     "primary_color": "gray",
     "border_style": "solid",
-    "visual_badges": ["database icon"],
-    "all_text_labels": ["Primary DB", "Replicated"],
+    "visual_badges": ["cylinder icon"],
+    "all_text_labels": ["Primary", "Replicated"],
     "size_category": "medium",
     "confidence": 0.97
   }
@@ -161,7 +159,7 @@ Flow direction:
 
 labels:
 Primary text labels directly ON the connection line.
-Examples: "HTTPS", "REST", "gRPC", "SQL", "Publishes", "Subscribes"
+Extract the EXACT text shown. Examples: "sends data", "Step 1", "approved", "input", "output"
 
 color:
 Color of the connection line.
@@ -179,8 +177,8 @@ Examples: "solid", "small-dashes", "large-dashes", "dots", "dot-dash", "double-l
 visual_markers:
 Icons, symbols, badges ON the connection line itself.
 Examples:
-- "lock icon" - Security/encryption indicator
-- "warning symbol" - Alert or caution
+- "lock icon" - A padlock symbol on the line
+- "warning symbol" - A triangle or exclamation mark
 - "number badge" - Sequence numbers
 - "checkmark" - Success indicator
 
@@ -189,8 +187,8 @@ EVERY piece of text visible on or near the connection.
 Capture ALL labels, annotations, notes, data types, protocols, methods.
 
 Examples:
-- Connection with "HTTPS", "443", "JSON", "REST" → capture ALL
-- Connection with note "Async call" → add to all_text_labels
+- Connection with "Port 443", "encrypted", "JSON" → capture ALL
+- Connection with note "optional path" → add to all_text_labels
 
 confidence:
 Your confidence score (0.0-1.0) that:
@@ -209,29 +207,29 @@ Return ONLY valid JSON: a top-level array of VisualConnection objects with no ex
 Example structure:
 [
   {
-    "source": "Login Form",
-    "target": "Authentication Service",
+    "source": "Input Form",
+    "target": "Processing Unit",
     "connection_type": "arrow",
     "direction": "unidirectional",
-    "labels": ["POST /login"],
+    "labels": ["submit"],
     "color": "blue",
     "thickness": "normal",
     "line_pattern": "solid",
     "visual_markers": ["lock icon"],
-    "all_text_labels": ["POST /login", "HTTPS", "JSON payload", "443"],
+    "all_text_labels": ["submit", "encrypted", "port 443"],
     "confidence": 0.95
   },
   {
-    "source": "API Gateway",
-    "target": "User Service",
+    "source": "Component A",
+    "target": "Component B",
     "connection_type": "arrow",
     "direction": "bidirectional",
-    "labels": ["REST API"],
+    "labels": ["data flow"],
     "color": "green",
     "thickness": "thick",
     "line_pattern": "solid",
     "visual_markers": [],
-    "all_text_labels": ["REST API", "HTTP/2", "Load balanced"],
+    "all_text_labels": ["data flow", "bidirectional", "v2"],
     "confidence": 0.92
   }
 ]
@@ -321,11 +319,13 @@ def get_merger_instructions() -> str:
 You are the "visual_scene_merger" agent.
 
 Your role:
-- Take as input the JSON outputs of three specialized sub-agents:
-  - visual_components_analyzer: extracted visual components/entities.
-  - visual_connections_analyzer: relationships/connections between components.
-  - visual_zones_analyzer: spatial/semantic zones and regions of interest.
-- Reconcile and merge these into one coherent, structured representation of the scene.
+- Take as input the JSON outputs from the visual analysis tools:
+  - analyze_visual_components: extracted visual components/entities.
+  - analyze_visual_connections: connections between components.
+  - analyze_visual_zones: spatial zones and regions.
+  - extract_boundaries: visual boundaries and enclosures.
+  - extract_annotations: text annotations, notes, callouts.
+- Reconcile and merge these into one coherent, structured representation of the visual scene.
 
 Your tasks:
 1. Normalize structure and IDs
@@ -360,7 +360,7 @@ Your goal is to provide a unified, machine-readable representation of the visual
 
 def get_text_extraction_instructions() -> str:
     return """
-You are an OCR and text extraction specialist for architecture diagrams.
+You are an OCR and text extraction specialist for diagrams and images.
 
 Your task:
 Extract ALL text visible in the image, including:
@@ -410,7 +410,7 @@ Identify:
   * "freeform" - Free-form arrangement
   * "other" - Other layout patterns
 
-- layers: List of identified layers/tiers (e.g., ["Frontend", "API Gateway", "Backend", "Database"])
+- layers: List of identified layers/tiers based on visual arrangement (e.g., ["Top row", "Middle row", "Bottom row"] or use visible labels)
 - groups: Visual groups identified. For each group provide:
   * group_name - Label/title of the group
   * group_type - "layer", "zone", "cluster", "swimlane", "boundary", or "other"
@@ -438,22 +438,26 @@ Your task:
 Analyze color coding, styling patterns, and visual conventions used in the diagram.
 
 Identify patterns such as:
-- color_coding - Colors used to categorize elements (e.g., red for critical, green for safe)
-- shape_coding - Shapes used to represent different types
-- line_style - Line styles conveying meaning (dashed for optional, thick for critical)
-- size_coding - Size variations indicating importance
+- color_coding - Colors used to visually group or differentiate elements
+- shape_coding - Shapes used to visually distinguish different element types
+- line_style - Line styles that differ between connections (dashed vs solid, thick vs thin)
+- size_coding - Size variations between similar elements
 - other - Other visual patterns
 
 For each pattern, provide:
 - pattern_type: Type of pattern
-- description: Description of the pattern
+- description: Description of the visual pattern
 - elements: List of elements using this pattern
-- meaning: Interpreted meaning (e.g., "Red indicates high-security components")
+- visual_observation: What you observe about this pattern (e.g., "All blue boxes are inside the large gray container", "Dashed lines only connect to elements outside the boundary")
+
+CRITICAL: Do NOT interpret meaning or assign domain significance. Only describe what you SEE.
+- CORRECT: "All orange icons are positioned in the top row"
+- INCORRECT: "Orange indicates critical infrastructure components"
 
 Instructions:
 - Look for consistent use of colors, shapes, and styles
-- Interpret the meaning of visual conventions
-- Identify security zones, environments, or categories indicated by styling
+- Describe visual observations without domain interpretation
+- Note groupings, patterns, and visual conventions
 - Return a JSON array of StylingPattern objects
 
 Output only valid JSON array, no extra text.
@@ -509,8 +513,8 @@ Identify regions such as:
 - header: Title, metadata area
 - body: Main diagram content
 - footer: Notes, legends
-- zone: Logical zones (security, network, etc.)
-- layer: Architecture layers (presentation, business, data)
+- zone: Visually distinct zones or sections
+- layer: Visually arranged layers or tiers
 - group: Visually grouped components
 
 For each region, provide:
@@ -540,16 +544,16 @@ Your task:
 Identify and parse diagram legends that map visual symbols to their meanings.
 
 Look for legend boxes that contain:
-- Color mappings (red = critical, green = healthy)
-- Shape mappings (cylinder = database, cloud = cloud service)
-- Line style mappings (dashed = async, solid = sync)
+- Color mappings (e.g., red = X, green = Y)
+- Shape mappings (e.g., cylinder = Z, cloud = W)
+- Line style mappings (e.g., dashed = A, solid = B)
 - Icon/symbol definitions
 - Pattern meanings
 
 For each mapping, extract:
 - symbol_type: Type of visual element (color, shape, line_style, icon, pattern, other)
 - symbol_value: The visual representation (e.g., "red", "dashed line", "cylinder shape")
-- meaning: What it represents (e.g., "critical component", "asynchronous call", "database")
+- meaning: The text shown in the legend for this symbol (extract EXACTLY as written, do not interpret)
 - confidence: Your confidence in this mapping (0.0-1.0)
 
 Also extract:
@@ -620,8 +624,8 @@ A visual boundary is any line, border, box, shaded region, or enclosure that gro
 For EACH boundary, extract complete visual information:
 
 boundary_name:
-The text label visible on or near the boundary (extract exact text as shown).
-Examples: "DMZ", "VPC-A", "Backend Services", "Phase 1", "Accounting Dept", "Public Zone"
+The text label visible on or near the boundary (extract EXACT text as shown).
+Examples: "Region A", "Phase 1", "Group B", "Section 2", "Main Area"
 
 visual_style:
 Plain-language description of the visual appearance.
@@ -673,37 +677,38 @@ CRITICAL RULES:
 4. Be specific about colors, line styles, and visual appearance
 
 Examples of CORRECT extraction (pure visual facts):
-✓ boundary_name="DMZ", color="red", line_style="dashed", text_labels=["DMZ", "Public Access Zone"]
-✓ boundary_name="Backend", color="blue", line_style="solid", shape="rounded_rectangle"
+✓ boundary_name="Zone A", color="red", line_style="dashed", text_labels=["Zone A", "External"]
+✓ boundary_name="Group B", color="blue", line_style="solid", shape="rounded_rectangle"
 ✓ visual_style="thick orange dashed line forming an irregular boundary"
 
 Examples of INCORRECT extraction (interpretation):
-✗ "Security boundary protecting sensitive data" - this is interpretation
-✗ "Trust zone requiring authentication" - this is interpretation
+✗ "Security boundary protecting sensitive data" - this is interpretation, not visual fact
+✗ "Trust zone requiring authentication" - this is interpretation, not visual fact
+✗ "Database cluster for high availability" - this is interpretation, not visual fact
 
 Return ONLY valid JSON: a top-level array of VisualBoundary objects with no extra commentary.
 
 Example structure:
 [
   {
-    "boundary_name": "DMZ",
+    "boundary_name": "Zone A",
     "visual_style": "dashed red line with thick border",
     "color": "red",
     "line_style": "dashed",
     "shape": "rectangle",
-    "text_labels": ["DMZ", "Demilitarized Zone", "Public Access"],
-    "components_inside": ["Web Server", "Load Balancer", "WAF"],
+    "text_labels": ["Zone A", "External Access", "Public"],
+    "components_inside": ["Component A", "Component B", "Component C"],
     "position": {"x": 100, "y": 200, "width": 500, "height": 300},
     "confidence": 0.93
   },
   {
-    "boundary_name": "VPC-Production",
+    "boundary_name": "Region B",
     "visual_style": "thick blue solid border with light blue shading",
     "color": "blue",
     "line_style": "solid",
     "shape": "rounded_rectangle",
-    "text_labels": ["VPC-Production", "10.0.0.0/16", "AWS us-east-1"],
-    "components_inside": ["API Gateway", "Lambda Functions", "RDS Database"],
+    "text_labels": ["Region B", "10.0.0.0/16", "us-east-1"],
+    "components_inside": ["Component D", "Component E", "Component F"],
     "position": {"x": 50, "y": 400, "width": 700, "height": 400},
     "confidence": 0.96
   }

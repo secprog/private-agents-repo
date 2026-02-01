@@ -45,34 +45,39 @@ session_service = DatabaseSessionService(db_url=db_url)
 # Initialize security analyzer (no longer needs artifact service - receives JSON from vision agent)
 architecture_analysis = ArchitectureAnalysis()
 
-# Create security analysis sub-agent
-# This agent receives comprehensive visual analysis from the vision agent
-# and performs security-focused analysis
+# Create security analysis sub-agent with multi-phase analysis tools
 security_analyzer_sub_agent = Agent(
     name="security_analyzer",
-    description="Specialized sub-agent for security analysis of architecture diagrams using comprehensive vision data",
+    description="Specialized sub-agent for multi-phase security analysis of architecture diagrams",
     model=LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5.1")),
-    instruction="""You are a cybersecurity architecture specialist.
+    instruction="""You are a cybersecurity architecture specialist performing multi-phase security analysis.
 
-You receive comprehensive visual analysis data from the vision agent including:
-- Visual components, connections, and zones
-- Trust boundaries and security zones
-- Detected technologies and frameworks
-- Inferred relationships and dependencies
-- Annotations and legend mappings
+You receive GENERIC VISUAL DATA from the vision agent (component_type is a visual category like icon/labeled_box/shape - NOT IT roles). You must interpret it for security meaning.
 
-Your task is to perform thorough security analysis:
-1. Identify security threats and vulnerabilities
-2. Analyze potential attack paths
-3. Check compliance with security frameworks
-4. Provide actionable security recommendations
+WORKFLOW - Execute these steps IN ORDER:
 
-CRITICAL: 
-- You MUST call the analyze_architecture_security tool with ALL available vision data
-- Do not modify the input data
-- Output the complete security analysis in JSON format
-- Prioritize findings by risk level""",
-    tools=[architecture_analysis.analyze_architecture_security],
+1. **identify_security_context**: Call this FIRST with ALL visual data (components, connections, zones, boundaries, annotations, legend_mappings, line_crossings). This interprets generic visual facts into IT roles, technologies, protocols, encryption status, and security zones. Save the result as security_context_json.
+
+2. **analyze_threats_and_vulnerabilities**: Call with security_context_json + original components_json, connections_json, boundaries_json. Identifies threats (STRIDE) and vulnerabilities. Save the result as threats_json.
+
+3. **analyze_attack_paths**: Call with security_context_json + threats_json. Traces attack paths through the architecture. Save the result as attack_paths_json.
+
+4. **assess_compliance**: Call with security_context_json. Checks compliance against GDPR, HIPAA, PCI DSS, SOC2, ISO 27001, NIST, CIS, OWASP. Save the result as compliance_json.
+
+5. **generate_recommendations**: Call with security_context_json + threats_json + attack_paths_json + compliance_json. Produces prioritized recommendations, security posture score, and executive summary.
+
+CRITICAL:
+- Execute ALL 5 steps in sequence - each builds on previous results
+- Pass the JSON output from each step as input to the next
+- Do not skip any step
+- Return the COMPLETE results from all steps""",
+    tools=[
+        architecture_analysis.identify_security_context,
+        architecture_analysis.analyze_threats_and_vulnerabilities,
+        architecture_analysis.analyze_attack_paths,
+        architecture_analysis.assess_compliance,
+        architecture_analysis.generate_recommendations,
+    ],
     planner=BuiltInPlanner(thinking_config=thinking_config)
 )
 
@@ -83,17 +88,20 @@ root_agent = Agent(
     description="Specialized agent for cybersecurity architecture analysis and threat assessment.",
     model=LiteLlm(model=os.getenv("LLM_MODEL", "openai/gpt-5.1")),
     instruction="""You are a cybersecurity specialist agent.
-    
+
 Your role is to analyze architecture diagrams for security threats, vulnerabilities, and compliance.
 
-IMPORTANT WORKFLOW:
-1. You receive comprehensive visual analysis data from the vision agent
-2. You delegate security analysis to the security_analyzer sub-agent
-3. The sub-agent returns detailed security findings and recommendations
+WORKFLOW:
+1. You receive generic visual analysis data from the vision agent (JSON)
+2. You delegate to the security_analyzer sub-agent which performs multi-phase analysis:
+   - Phase 1: Interpret visual data into security context (technologies, protocols, zones)
+   - Phase 2: Identify threats and vulnerabilities
+   - Phase 3: Analyze attack paths
+   - Phase 4: Assess compliance
+   - Phase 5: Generate recommendations and security posture score
+3. Return the complete analysis results
 
-You do NOT perform visual analysis yourself. You receive structured JSON data from the vision agent and focus on security assessment.
-
-Delegate all security analysis tasks to the security_analyzer sub-agent.
+You do NOT perform visual analysis yourself. Pass ALL received visual data to the security_analyzer sub-agent.
 Do not modify the input or output data.""",
     sub_agents=[security_analyzer_sub_agent],
     planner=BuiltInPlanner(thinking_config=thinking_config)
