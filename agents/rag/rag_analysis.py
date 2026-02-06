@@ -5,6 +5,7 @@ RAG Analysis Module - Document retrieval and knowledge extraction
 import os
 import logging
 import json
+import asyncio
 from typing import List, Dict
 from dotenv import load_dotenv
 from neo4j import AsyncGraphDatabase
@@ -591,10 +592,9 @@ Do not include any explanation, just the JSON array."""
             if not documents:
                 return json.dumps({"results": [], "message": "No documents provided"})
 
-            # Score each document using LLM
-            scored_docs = []
-            for doc in documents:
-                doc_text = doc.get("text", "")[:2000]  # Limit text length
+            # Score each document using LLM (concurrently)
+            async def _score_doc(doc):
+                doc_text = doc.get("text", "")[:6000]  # Limit text length
 
                 prompt = f"""Rate the relevance of this document to the query on a scale of 0-100.
 
@@ -620,14 +620,15 @@ Return ONLY a number between 0 and 100, nothing else."""
                             if hasattr(part, "text") and part.text:
                                 response_text += part.text
 
-                # Parse score
                 try:
                     score = float(response_text.strip())
                     score = max(0, min(100, score))  # Clamp to 0-100
                 except ValueError:
                     score = 0.0
 
-                scored_docs.append((doc, score))
+                return (doc, score)
+
+            scored_docs = await asyncio.gather(*[_score_doc(doc) for doc in documents])
 
             # Sort by score descending and take top_k
             scored_docs.sort(key=lambda x: x[1], reverse=True)
