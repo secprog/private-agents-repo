@@ -132,9 +132,7 @@ vision_result = await vision_agent.analyze({
 # - detect_trust_boundaries()
 # - detect_technologies()
 # - infer_relationships()
-# - extract_legend_mappings()
 # - extract_annotations()
-# - detect_line_crossings()
 ```
 
 ### Step 2: Cybersecurity Agent Analysis

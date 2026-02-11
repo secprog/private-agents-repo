@@ -11,11 +11,6 @@ uvicorn[standard]>=0.25.0
 
 litellm>=1.80.12
 
-# Security Analysis Tools
-bandit>=1.7.5
-safety>=3.0.1
-pyyaml>=6.0.1
-
 # Database
 psycopg[binary]>=3.1.0
 sqlalchemy>=2.0.0
@@ -25,12 +20,7 @@ neo4j>=5.0.0
 python-dotenv>=1.0.0
 pydantic>=2.10.0
 httpx>=0.28.0
-
-# File Processing and Analysis
-pandas>=2.0.0
-python-pptx>=0.6.21
-PyPDF2>=3.0.0
-Pillow>=10.0.0
+transformers>=4.41.0
 
 # Development and Testing
 pytest>=8.0.0
