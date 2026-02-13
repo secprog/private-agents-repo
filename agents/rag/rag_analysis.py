@@ -38,6 +38,7 @@ from models import (
     CommunityRetrievalResponse,
     PayloadSearchResponse,
 )
+from multimodal_embeddings import multimodal_embed_text, require_video_capable_model
 
 # Load environment variables
 load_dotenv()
@@ -122,6 +123,10 @@ CITATION_REPAIR_ENABLED = _env_bool("CITATION_REPAIR_ENABLED", True)
 DEBUG_RETRIEVAL_METRICS = _env_bool("DEBUG_RETRIEVAL_METRICS", False)
 ENTITY_FUZZY_EDIT_DISTANCE = _env_int("ENTITY_FUZZY_EDIT_DISTANCE", 1)
 MIN_CITATIONS = _env_int("MIN_CITATIONS", 2)
+TOP_K_IMAGE_VEC_PAYLOADS = _env_int("TOP_K_IMAGE_VEC_PAYLOADS", 5)
+TOP_K_AUDIO_VEC_PAYLOADS = _env_int("TOP_K_AUDIO_VEC_PAYLOADS", 5)
+TOP_K_AUDIO_LEX_PAYLOADS = _env_int("TOP_K_AUDIO_LEX_PAYLOADS", 5)
+TOP_K_VIDEO_VEC_PAYLOADS = _env_int("TOP_K_VIDEO_VEC_PAYLOADS", 5)
 TOKENIZER_HF_MODEL = _require_env("LLM_MODEL").strip()
 TOKENIZER_HF_USE_FAST = _env_bool("TOKENIZER_HF_USE_FAST", True)
 TOKENIZER_HF_TRUST_REMOTE_CODE = _env_bool("TOKENIZER_HF_TRUST_REMOTE_CODE", False)
@@ -382,6 +387,9 @@ class RAGAnalysis:
         except Exception:
             return {}
 
+    async def _multimodal_text_embed(self, text: str) -> List[float]:
+        return await asyncio.to_thread(multimodal_embed_text, text)
+
     @staticmethod
     def _validate_probe_embedding(probe: List[float], model_name: str) -> int:
         if not probe:
@@ -403,8 +411,14 @@ class RAGAnalysis:
         async with self._embedding_compat_lock:
             if self._embedding_compat_checked:
                 return
+            require_video_capable_model(force=True)
             probe = await self.embeddings.embed_query("dimension probe")
             probe_dim = self._validate_probe_embedding(probe, self.embeddings.model)
+            multimodal_probe = await self._multimodal_text_embed("dimension probe")
+            multimodal_probe_dim = self._validate_probe_embedding(
+                multimodal_probe,
+                _require_env("MULTIMODAL_EMBEDDING_MODEL"),
+            )
             runtime_deployment = self.embeddings.model
             cfg_rows = await self.neo4j.query(
                 """
@@ -444,11 +458,48 @@ class RAGAnalysis:
                 SHOW INDEXES
                 YIELD name, type, options
                 WHERE type='VECTOR'
-                  AND name IN ['chunk_embedding_index', 'payload_embedding_index']
+                  AND name IN [
+                    'chunk_embedding_index',
+                    'payload_embedding_index',
+                    'community_embedding_index',
+                    'payload_image_embedding_index',
+                    'payload_audio_embedding_index',
+                    'payload_video_embedding_index'
+                  ]
                 RETURN name, options
                 """
             )
+            required_vector_indexes = {
+                "chunk_embedding_index",
+                "payload_embedding_index",
+                "community_embedding_index",
+                "payload_image_embedding_index",
+                "payload_audio_embedding_index",
+                "payload_video_embedding_index",
+            }
+            found_indexes = {row.get("name") for row in idx_rows if row.get("name")}
+            missing_indexes = sorted(required_vector_indexes - found_indexes)
+            if missing_indexes:
+                raise RuntimeError(
+                    "Missing required vector index(es): "
+                    + ", ".join(missing_indexes)
+                    + ". Run ingestion setup_constraints() first."
+                )
+
+            text_dim_indexes = {
+                "chunk_embedding_index",
+                "payload_embedding_index",
+                "community_embedding_index",
+                "payload_audio_embedding_index",
+            }
+            multimodal_dim_indexes = {
+                "payload_image_embedding_index",
+                "payload_video_embedding_index",
+            }
             for row in idx_rows:
+                index_name = row.get("name")
+                if not index_name:
+                    continue
                 options = row.get("options") or {}
                 cfg = options.get("indexConfig") if isinstance(options, dict) else {}
                 dim_raw = cfg.get("vector.dimensions") if isinstance(cfg, dict) else None
@@ -458,17 +509,56 @@ class RAGAnalysis:
                     idx_dim = int(dim_raw)
                 except (TypeError, ValueError):
                     continue
-                if idx_dim != probe_dim:
+                if index_name in text_dim_indexes and idx_dim != probe_dim:
                     raise RuntimeError(
                         "Embedding/index dimension mismatch: "
-                        f"index={row.get('name')} index_dim={idx_dim} probe_dim={probe_dim}, "
+                        f"index={index_name} index_dim={idx_dim} probe_dim={probe_dim}, "
                         f"model={self.embeddings.model}"
+                    )
+                if index_name in multimodal_dim_indexes and idx_dim != multimodal_probe_dim:
+                    raise RuntimeError(
+                        "Multimodal embedding/index dimension mismatch: "
+                        f"index={index_name} index_dim={idx_dim} multimodal_probe_dim={multimodal_probe_dim}"
                     )
             self._embedding_compat_checked = True
 
     async def verify_runtime(self) -> None:
         """Fail fast on critical runtime mismatches before serving requests."""
         await self._ensure_embedding_compatibility()
+        rows = await self.neo4j.query(
+            """
+            SHOW INDEXES
+            YIELD name, type
+            WHERE name IN [
+              'payload_embedding_index',
+              'payload_image_embedding_index',
+              'payload_audio_embedding_index',
+              'payload_video_embedding_index',
+              'payload_transcript_ft'
+            ]
+            RETURN name, type
+            """
+        )
+        expected = {
+            "payload_embedding_index": "VECTOR",
+            "payload_image_embedding_index": "VECTOR",
+            "payload_audio_embedding_index": "VECTOR",
+            "payload_video_embedding_index": "VECTOR",
+            "payload_transcript_ft": "FULLTEXT",
+        }
+        by_name = {row.get("name"): row.get("type") for row in rows if row.get("name")}
+        missing = [name for name in expected if name not in by_name]
+        if missing:
+            raise RuntimeError(
+                "Missing required payload index(es): " + ", ".join(sorted(missing))
+            )
+        wrong_type = [
+            name for name, idx_type in expected.items() if by_name.get(name) != idx_type
+        ]
+        if wrong_type:
+            raise RuntimeError(
+                "Payload index type mismatch for: " + ", ".join(sorted(wrong_type))
+            )
 
     @staticmethod
     def _normalize_entity_token(ent: str) -> str:
@@ -1751,7 +1841,7 @@ Return ONLY valid JSON, no explanation."""
         self, search_query: str, top_k: int = 5, min_score: float = 0.0
     ) -> str:
         """
-        Search image/table payloads using vector and lexical signals over alt text.
+        Search payloads across text, image, audio, and video indexes with weighted RRF fusion.
         """
         if len(search_query) > MAX_QUERY_LEN:
             return ErrorResponse(error=f"Query too long ({len(search_query)} chars, max {MAX_QUERY_LEN})").model_dump_json()
@@ -1765,42 +1855,141 @@ Return ONLY valid JSON, no explanation."""
                 return ErrorResponse(error="Neo4j not configured").model_dump_json()
 
             emb = await self.embeddings.embed_query(search_query)
-            vector_hits, lexical_hits = await asyncio.gather(
-                self.neo4j.query(
-                    """
-                    CALL db.index.vector.queryNodes('payload_embedding_index', $k, $embedding)
-                    YIELD node, score
-                    RETURN node.assetId AS id, node.alt_text AS alt_text, node.type AS type, score
-                    ORDER BY score DESC
-                    """,
-                    {"k": max(top_k, 1), "embedding": emb},
-                ),
-                self.neo4j.query(
-                    """
-                    CALL db.index.fulltext.queryNodes('payload_text_ft', $query)
-                    YIELD node, score
-                    RETURN node.assetId AS id, node.alt_text AS alt_text, node.type AS type, score
-                    ORDER BY score DESC
-                    LIMIT $limit
-                    """,
-                    {"query": _build_lucene_query(search_query), "limit": max(top_k, 1)},
-                ),
+            multimodal_query_embedding = await self._multimodal_text_embed(search_query)
+            lucene_query = _build_lucene_query(search_query)
+            top_k_base = max(top_k, 1)
+            top_k_image = max(TOP_K_IMAGE_VEC_PAYLOADS, 1)
+            top_k_audio_vec = max(TOP_K_AUDIO_VEC_PAYLOADS, 1)
+            top_k_audio_lex = max(TOP_K_AUDIO_LEX_PAYLOADS, 1)
+            top_k_video_vec = max(TOP_K_VIDEO_VEC_PAYLOADS, 1)
+
+            text_vector_coro = self.neo4j.query(
+                """
+                CALL db.index.vector.queryNodes('payload_embedding_index', $k, $embedding)
+                YIELD node, score
+                RETURN node.assetId AS id,
+                       node.transcript AS transcript,
+                       node.video_summary AS video_summary,
+                       node.type AS type,
+                       score
+                ORDER BY score DESC
+                """,
+                {"k": top_k_base, "embedding": emb},
+            )
+            image_vector_coro = self.neo4j.query(
+                """
+                CALL db.index.vector.queryNodes('payload_image_embedding_index', $k, $embedding)
+                YIELD node, score
+                RETURN node.assetId AS id,
+                       node.transcript AS transcript,
+                       node.video_summary AS video_summary,
+                       node.type AS type,
+                       score
+                ORDER BY score DESC
+                """,
+                {"k": top_k_image, "embedding": multimodal_query_embedding},
+            )
+            audio_query_embedding = emb
+            audio_vector_coro = self.neo4j.query(
+                """
+                CALL db.index.vector.queryNodes('payload_audio_embedding_index', $k, $embedding)
+                YIELD node, score
+                RETURN node.assetId AS id,
+                       node.transcript AS transcript,
+                       node.video_summary AS video_summary,
+                       node.type AS type,
+                       score
+                ORDER BY score DESC
+                """,
+                {"k": top_k_audio_vec, "embedding": audio_query_embedding},
+            )
+            audio_lexical_coro = self.neo4j.query(
+                """
+                CALL db.index.fulltext.queryNodes('payload_transcript_ft', $query)
+                YIELD node, score
+                RETURN node.assetId AS id,
+                       node.transcript AS transcript,
+                       node.video_summary AS video_summary,
+                       node.type AS type,
+                       score
+                ORDER BY score DESC
+                LIMIT $limit
+                """,
+                {"query": lucene_query, "limit": top_k_audio_lex},
+            )
+            video_vector_coro = self.neo4j.query(
+                """
+                CALL db.index.vector.queryNodes('payload_video_embedding_index', $k, $embedding)
+                YIELD node, score
+                WHERE coalesce(node.type, '') = 'video'
+                RETURN node.assetId AS id,
+                       node.transcript AS transcript,
+                       node.video_summary AS video_summary,
+                       node.type AS type,
+                       score
+                ORDER BY score DESC
+                """,
+                {"k": top_k_video_vec, "embedding": multimodal_query_embedding},
             )
 
+            (
+                text_vector_hits,
+                image_vector_hits,
+                audio_vector_hits,
+                audio_lexical_hits,
+                video_vector_hits,
+            ) = await asyncio.gather(
+                text_vector_coro,
+                image_vector_coro,
+                audio_vector_coro,
+                audio_lexical_coro,
+                video_vector_coro,
+            )
+
+            ranked_lists = {
+                "text_vector": text_vector_hits,
+                "image_vector": image_vector_hits,
+                "audio_vector": audio_vector_hits,
+                "audio_lexical": audio_lexical_hits,
+                "video_vector": video_vector_hits,
+            }
             fused_candidates = self._score_aware_rrf(
-                {"vector": vector_hits, "lexical": lexical_hits},
-                weights={"vector": 1.2, "lexical": 1.0},
+                ranked_lists,
+                weights={
+                    "text_vector": 1.0,
+                    "image_vector": 1.2,
+                    "audio_vector": 1.0,
+                    "audio_lexical": 1.0,
+                    "video_vector": 1.2,
+                },
                 top_k=max(top_k * 3, top_k),
                 k=RRF_K,
             )
             meta: Dict[str, Dict[str, Any]] = {
                 row.get("id"): row
-                for row in vector_hits + lexical_hits
+                for row in (
+                    text_vector_hits
+                    + image_vector_hits
+                    + audio_vector_hits
+                    + audio_lexical_hits
+                    + video_vector_hits
+                )
                 if isinstance(row, dict) and row.get("id")
             }
             ranked_ids = [r.get("id") for r in fused_candidates if r.get("id")][:top_k]
+            modalities_searched = [
+                "text_vector",
+                "image_vector",
+                "audio_vector",
+                "audio_lexical",
+                "video_vector",
+            ]
             if not ranked_ids:
-                return PayloadSearchResponse(results=[], count=0).model_dump_json()
+                return PayloadSearchResponse(
+                    results=[],
+                    count=0,
+                    modalities_searched=modalities_searched,
+                ).model_dump_json()
 
             chunk_links = await self.neo4j.query(
                 """
@@ -1832,7 +2021,9 @@ Return ONLY valid JSON, no explanation."""
                 results.append(item)
 
             return PayloadSearchResponse(
-                results=results, count=len(results)
+                results=results,
+                count=len(results),
+                modalities_searched=modalities_searched,
             ).model_dump_json()
         except Exception as e:
             logger.error(f"Payload search failed: {e}")
@@ -2329,7 +2520,18 @@ Return ONLY valid JSON, no explanation."""
                 WITH idx, c,
                      collect(DISTINCT e.name)[0..8] AS entities,
                      [s IN collect(DISTINCT comm.summary) WHERE s IS NOT NULL AND s <> ""][0..3] AS community_summaries,
-                     [x IN collect(DISTINCT {type: p.type, alt_text: p.alt_text}) WHERE x.alt_text IS NOT NULL AND x.alt_text <> ""][0..3] AS payloads
+                     [
+                        x IN collect(
+                            DISTINCT {
+                                type: p.type,
+                                transcript: p.transcript,
+                                video_summary: p.video_summary
+                            }
+                        )
+                        WHERE (x.transcript IS NOT NULL AND x.transcript <> "")
+                           OR (x.video_summary IS NOT NULL AND x.video_summary <> "")
+                           OR x.type IN ['image', 'table', 'video']
+                     ][0..3] AS payloads
                 RETURN idx, c.id AS id, c.text AS text, entities, community_summaries, payloads
                 ORDER BY idx
                 LIMIT $limit
@@ -2393,11 +2595,25 @@ Return ONLY valid JSON, no explanation."""
                 if comms:
                     lines.append("Community context: " + " | ".join(comms))
                 payloads = row.get("payloads") or []
-                payload_lines = [
-                    f"{p.get('type', 'payload')}: {p.get('alt_text', '')}"
-                    for p in payloads
-                    if isinstance(p, dict)
-                ]
+                payload_lines = []
+                for p in payloads:
+                    if not isinstance(p, dict):
+                        continue
+                    ptype = (p.get("type") or "payload").strip().lower()
+                    transcript = (p.get("transcript") or "").strip()
+                    if ptype == "audio":
+                        if transcript:
+                            payload_lines.append(f"audio transcript: {transcript[:600]}")
+                    elif ptype == "video":
+                        video_summary = (p.get("video_summary") or "").strip()
+                        if video_summary:
+                            payload_lines.append(f"video summary: {video_summary[:450]}")
+                        if transcript:
+                            payload_lines.append(f"video transcript: {transcript[:600]}")
+                    elif ptype in {"image", "table"}:
+                        payload_lines.append(f"{ptype}: visual payload available")
+                    elif transcript:
+                        payload_lines.append(f"{ptype} transcript: {transcript[:300]}")
                 if payload_lines:
                     lines.append("Payloads: " + " | ".join(payload_lines))
                 block = "\n".join(lines).strip()

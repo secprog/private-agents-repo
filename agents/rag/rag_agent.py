@@ -99,7 +99,7 @@ SEARCH TOOLS:
 RETRIEVAL TOOLS:
 7. graph_based_retrieval - Retrieve documents based on entity relationships in the graph
 8. community_based_retrieval - Retrieve chunks through detected graph communities
-9. payload_search - Retrieve visual/table payloads linked to chunks
+9. payload_search - Retrieve multi-modal payloads (image/table/audio/video) linked to chunks using fused text+image+audio+video indexes
 10. get_chunk_context - Expand a chunk with its neighboring chunks from the same document for fuller context
 
 QUERY TOOLS:
@@ -133,7 +133,7 @@ WORKFLOW for answering questions:
       - lexical_search for exact keyword matches
       - graph_based_retrieval if entities were found
       - community_based_retrieval if entities were found
-      - payload_search for image/table context
+      - payload_search for image/table/audio/video context
    d. Use reciprocal_rank_fusion to combine results:
       Example: {"vector": [...], "lexical": [...], "entity": [...]}
       With weights: {"vector": 1.2, "lexical": 1.0, "entity": 0.8}

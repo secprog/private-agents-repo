@@ -129,6 +129,10 @@ class PayloadSearchResponse(BaseModel):
     """Response from payload search"""
     results: List[Dict[str, Any]] = Field(description="Payload search results")
     count: int = Field(description="Number of results")
+    modalities_searched: List[str] = Field(
+        default_factory=list,
+        description="Payload retrieval channels queried (text/image/audio/video)"
+    )
 
 
 class LexicalSearchResponse(BaseModel):
